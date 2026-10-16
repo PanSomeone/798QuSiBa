@@ -1,0 +1,39 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!--
+      Artwork is drawn inside a 0.64 scale about the canvas centre.
+
+      An adaptive icon's canvas is 108dp but only the central 66dp is guaranteed
+      to survive — every launcher masks it differently, and the splash screen
+      draws the foreground unmasked. Drawn at full size the drop ran from 24 to
+      81.5 and the slash from 30 to 80.6, so it spilled straight out of the safe
+      zone and, on the splash screen, filled the screen edge to edge. Scaling
+      about (54,54) keeps the whole mark comfortably inside the 66dp circle
+      whatever the mask does.
+    -->
+    <group
+        android:pivotX="54"
+        android:pivotY="54"
+        android:scaleX="0.64"
+        android:scaleY="0.64">
+
+        <!-- A water drop, struck through: "hot water, unlocked". -->
+        <path
+            android:fillColor="#FF6B35"
+            android:pathData="M54,24 C54,24 34,47.5 34,61.5 C34,72.6 42.9,81.5 54,81.5 C65.1,81.5 74,72.6 74,61.5 C74,47.5 54,24 54,24 Z" />
+
+        <!-- Cold inner core, so the drop reads as heated from within. -->
+        <path
+            android:fillColor="#0B1220"
+            android:pathData="M54,38 C54,38 43,53.6 43,61.9 C43,68 47.9,73 54,73 C60.1,73 65,68 65,61.9 C65,53.6 54,38 54,38 Z" />
+
+        <!-- The strike-through: a slant cut, aggressive and deliberate. -->
+        <path
+            android:fillColor="#F2F5FA"
+            android:pathData="M30,52.2 L78,42.4 L80.6,49.6 L32.6,59.4 Z" />
+    </group>
+</vector>

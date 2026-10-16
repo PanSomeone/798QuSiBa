@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      API 31+ draws a splash screen from the *activity's* theme, so the icon has
+      to be declared here rather than on some separate splash theme nobody applies.
+
+      Without it the system falls back to the launcher foreground drawn at the
+      splash slot's own size, which is how a 40dp mark filled the whole screen
+      (see _proof/10_login_final.png). `ic_splash_logo` is the same artwork sized
+      for that slot.
+
+      The rest of this theme is inherited from values/themes.xml unchanged — only
+      the window shown before the first Compose frame differs.
+    -->
+    <style name="Theme.KillHuiShengHuo" parent="android:Theme.DeviceDefault.NoActionBar">
+        <item name="android:windowBackground">@color/window_background</item>
+        <item name="android:statusBarColor">@color/window_background</item>
+        <item name="android:navigationBarColor">@color/window_background</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:windowSplashScreenBackground">@color/window_background</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_splash_logo</item>
+        <item name="android:windowSplashScreenIconBackgroundColor">@color/window_background</item>
+    </style>
+</resources>

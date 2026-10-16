@@ -1,0 +1,36 @@
+# 构建产物。二者都不是源码，而且很大。
+build/
+app/build/
+.gradle/
+.kotlin/
+
+# 本机配置：`local.properties` 里是本机 Android SDK 的绝对路径，检出时由 Android
+# Studio 重新生成；`.idea/` 同理，它记的是这台机器的窗口布局和检查配置，不是这个
+# 工程的配置。
+local.properties
+.idea/
+
+# 不属于应用本身的开发素材：反编译工具、用来读参考实现的别人家 APK、真机截图。
+# 内容清单和「为什么不提交」写在 README.md 的「代码结构」一节末尾。
+_attic/
+
+# 测试时从设备上抓下来的截图与录屏，以及手工拷到根目录的那份 APK —— 构建产物
+# 属于 Release 页，不属于源码树。**故意锚定在仓库根目录**：不加根锚点的 `*.png`
+# 会连 `app/src/main/res/mipmap-*/ic_launcher.png` 一起吞掉，于是本地构建一切正常，
+# 别人 clone 下来直接失败。
+/*.png
+/*.jpg
+/*.mp4
+/*.apk
+
+# 这里没有任何东西是用正式密钥签名的，但万一将来加了，它不能被提交。
+# `*.jks` / `*.keystore` 是它可能的两种形状；`keystore.properties` 是密码可能待的地方。
+# `tools/make-keystore.cmd` 会把新密钥库放在 `keystore/` 下，所以那个目录也一起排除。
+*.jks
+*.keystore
+keystore.properties
+keystore/
+
+# `tools/` 里那两个 Python 脚本校对 profile 时留下的字节码缓存。它不是源码，而且
+# 每次都重新生成。
+__pycache__/

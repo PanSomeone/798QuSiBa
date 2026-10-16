@@ -1,0 +1,130 @@
+# Baseline profile: this app's own start-up path, and nothing else.
+#
+# Why a hand-written one instead of a generated one
+# -------------------------------------------------
+# The normal way to produce this file is the `androidx.baselineprofile` Gradle
+# plugin, which drives a Macrobenchmark on a device and emits a profile from what
+# it observed. That path needs `androidx.benchmark` to be downloaded, and this
+# project's dependency set is deliberately small. Guessing the whole app's hot
+# paths would be worse than no profile at all — a wrong entry costs dex size and
+# buys nothing — so this file is scoped to the one thing that can be reasoned
+# about and *checked* without measuring: the chain from process start to the first
+# frame.
+#
+# Every signature below is checked twice, and both checks are needed because they
+# catch different mistakes.
+#
+# `tools/check-profile.py --classes` reads the method table out of
+# `app/build/intermediates/compile_app_classes_jar/debug/.../classes.jar` and
+# compares the name and the parameter count against what the compiler emitted. It
+# catches a descriptor that was written wrong.
+#
+# `tools/check-profile.py --mapping` reads `app/build/outputs/mapping/benchmark/
+# mapping.txt` after R8 has run, and reports the entries that no longer name
+# anything in the built program. It catches a descriptor that was *right* and has
+# since stopped mattering, which is the failure mode that matters here: R8 inlines
+# and deletes, so an entry can be correct in the source and absent from the APK.
+#
+# Both checks exist because the first version of this file was written from memory.
+# Six of its lines -- including four that named accessors on `Palette` for objects
+# that are separate top-level declarations -- matched nothing at all, and a profile
+# entry with the wrong descriptor is not an error and not a warning: dexopt and R8
+# both drop it silently, so it costs the dex size of looking like intent and buys
+# nothing.
+#
+# The chain it covers
+# -------------------
+# `KillHuiShengHuoApp.onCreate` builds the object graph and the two
+# SharedPreferences stores → `MainActivity.onCreate` → `AppRoot` → the theme,
+# then `HotWaterScreen` and the tab bar, with `HotWaterViewModel` constructed
+# during that first composition and reading the device list. Nothing in the
+# settings, login or log screens is reachable before the first frame, and they
+# are deliberately absent.
+#
+# Library entries are deliberately absent too. Compose's own hot methods are the
+# part a generated profile is actually for, and the ones on this path are mostly
+# `inline` in Kotlin, which means the entry would point at a method R8 has
+# already removed. `tools/PERFORMANCE.md` says what that costs and what would fix
+# it.
+#
+# What makes it land in the APK
+# -----------------------------
+# The file has to sit exactly here — `src/main/baseline-prof.txt`, not in
+# `src/main/assets`. AGP compiles it into `assets/dexopt/baseline.prof` while
+# packaging. From there the ART Service picks it up at install time on Android
+# 12+, and `androidx.profileinstaller` (already a transitive dependency, 1.4.0)
+# installs it on the older releases this app still supports — `minSdk` is 26, and
+# without the installer everything below API 31 would ignore the file entirely.
+
+# Application and activity.
+HSPLcom/killhuishenghuo/KillHuiShengHuoApp;-><init>()V
+HSPLcom/killhuishenghuo/KillHuiShengHuoApp;->onCreate()V
+HSPLcom/killhuishenghuo/MainActivity;-><init>()V
+HSPLcom/killhuishenghuo/MainActivity;->onCreate(Landroid/os/Bundle;)V
+HSPLcom/killhuishenghuo/MainActivity;->logFirstFrame()V
+
+# Theme. Read on the very first composition, before any content is drawn.
+# `mode` carries a default, so the descriptor is the two-parameter method the
+# compiler emits for it plus the Composer, the changed-flags int, the default mask
+# and the marker object -- five, not the four the source suggests.
+HSPLcom/killhuishenghuo/ui/theme/KhsThemeKt;->KillHuiShengHuoTheme(Lcom/killhuishenghuo/data/local/ThemeMode;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;II)V
+# `getAppFontFamily()` is deliberately absent. It returns `FontFamily.Default`, so
+# the compiler inlined it at every use, R8 had nothing left to keep, and the mapping
+# for the built program does not contain the name. A profile entry for it would be
+# the exact shape of an entry that does nothing.
+HSPLcom/killhuishenghuo/ui/theme/KhsThemeKt;-><clinit>()V
+
+# The palettes and the scales. `KhsTheme.kt` reads these while building the
+# schemes, which happens once per process on the way to the first frame.
+#
+# `KhsTheme.kt` reads from `Palette`, not from `LightPalette`: the dark scheme is
+# what the first frame draws. `Radii`, `Spacing` and `Motion` are not here either,
+# and the reason is worth keeping, because it will look like an omission.
+#
+# `tools/check-profile.py --mapping` reads R8's mapping for the built program and
+# reports what survived. All four are gone from it, for two different reasons:
+#
+#   * `Radii` and `Spacing` are `object`s of `val`s with a literal initialiser, so
+#     the compiler inlined every use and R8 deleted the classes outright. Their
+#     entries named a class the shipped APK does not contain.
+#   * `LightPalette` and `Motion` still appear in the mapping, but only as inline
+#     frames: every one of their properties was inlined into a caller and the
+#     declarations were then removed. `Motion.spring()` is such a small generic
+#     function that it inlines into the tab bar, and nothing on the start-up path
+#     ever reads `LightPalette` at all -- the app starts dark.
+#
+# Those five lines were dropped rather than left in place. An entry that cannot
+# match is not free: it reads as intent, so the next person keeps it, and dex size
+# is the only thing it ever buys.
+HSPLcom/killhuishenghuo/ui/theme/Palette;-><clinit>()V
+
+# The first screen: the button, the tab bar, and the ambience canvas behind it.
+# The ambience is on this path because the first frame lays out the (empty) steam
+# canvas whether or not the water is running.
+HSPLcom/killhuishenghuo/ui/hotwater/HotWaterScreenKt;->HotWaterScreen(Lcom/killhuishenghuo/ui/hotwater/HotWaterViewModel;Lkotlin/jvm/functions/Function0;Landroidx/compose/ui/geometry/Rect;Lkotlin/jvm/functions/Function1;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
+HSPLcom/killhuishenghuo/ui/hotwater/HotWaterScreenKt;->HotWaterContent(Lcom/killhuishenghuo/ui/hotwater/HotWaterUiState;Landroidx/compose/ui/geometry/Rect;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
+HSPLcom/killhuishenghuo/ui/hotwater/HotWaterScreenKt;->getButtonLabel(Lcom/killhuishenghuo/ui/hotwater/HotWaterUiState;)Ljava/lang/String;
+HSPLcom/killhuishenghuo/ui/hotwater/HotWaterScreenKt;->getStatusLine(Lcom/killhuishenghuo/ui/hotwater/HotWaterUiState;)Ljava/lang/String;
+HSPLcom/killhuishenghuo/ui/components/GlassTabBarKt;->GlassTabBar(Lcom/killhuishenghuo/ui/components/MainTab;Lkotlin/jvm/functions/Function1;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
+HSPLcom/killhuishenghuo/ui/components/WaterAmbienceKt;->WaterAmbienceBox(ZLandroidx/compose/ui/geometry/Rect;Landroidx/compose/ui/Modifier;Lkotlin/jvm/functions/Function3;Landroidx/compose/runtime/Composer;II)V
+
+# State. The ViewModel is created during the first composition and immediately
+# reads the device list, so its constructor and the state it publishes are on the
+# path. The eleven-argument state constructor is the one worth having: it is
+# called on every state change for the life of the process.
+HSPLcom/killhuishenghuo/ui/hotwater/HotWaterViewModel;-><init>(Lcom/killhuishenghuo/data/repository/HuiShengHuoRepository;Lcom/killhuishenghuo/data/local/PreferencesStore;Ljava/lang/String;Lkotlin/jvm/functions/Function0;)V
+HSPLcom/killhuishenghuo/ui/hotwater/HotWaterViewModel;->refreshDevices()V
+HSPLcom/killhuishenghuo/ui/hotwater/HotWaterUiState;-><init>(ZLjava/util/List;Lcom/killhuishenghuo/data/model/Device;ZLjava/lang/Boolean;JZLjava/lang/String;ZZLjava/lang/String;)V
+HSPLcom/killhuishenghuo/ui/hotwater/HotWaterViewModelFactory;-><init>(Lcom/killhuishenghuo/data/repository/HuiShengHuoRepository;Lcom/killhuishenghuo/data/local/PreferencesStore;Ljava/lang/String;)V
+
+# Where the device list comes from before the first frame. It is read out of
+# SharedPreferences, which is why the stores are here and the HTTP stack is not —
+# the first frame does not wait for a network response.
+HSPLcom/killhuishenghuo/data/local/SharedPreferencesPreferencesStore;-><init>(Landroid/content/Context;)V
+HSPLcom/killhuishenghuo/data/local/SharedPreferencesPreferencesStore;->getThemeMode()Lcom/killhuishenghuo/data/local/ThemeMode;
+HSPLcom/killhuishenghuo/data/local/SharedPreferencesPreferencesStore;->getSelectedDeviceId()Ljava/lang/String;
+HSPLcom/killhuishenghuo/data/local/SharedPreferencesSessionStore;-><init>(Landroid/content/Context;)V
+
+# The object graph the application builds in `onCreate`. On the start-up path even
+# though none of it is UI.
+HSPLcom/killhuishenghuo/core/net/NetworkModule;-><clinit>()V

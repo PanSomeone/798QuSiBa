@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ic_launcher_background">#0B1220</color>
+
+    <!--
+      Must stay equal to Palette.Slate (ui/theme/Palette.kt:23). Used for the
+      pre-Compose window background and for the system bars in themes.xml, where
+      the value has to exist as a resource because the theme is inflated before
+      any Kotlin runs.
+    -->
+    <color name="window_background">#0E1420</color>
+</resources>

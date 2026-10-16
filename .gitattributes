@@ -1,2 +1,24 @@
-# Auto detect text files and perform LF normalization
-* text=auto
+# Normalize line endings on the way into the repository.
+#
+# Everything here is LF in the repository, whatever the machine that commits it
+# happens to use. Without this, a Windows checkout stores CRLF and a Linux
+# checkout stores LF, so the same commit produces a diff on the other machine —
+# and `gradlew` (the shell script, not gradlew.bat) with a CRLF shebang fails to
+# run at all on Linux and macOS.
+* text=auto eol=lf
+
+# Windows-only launcher: CRLF is what cmd.exe and PowerShell expect.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binaries. `text=auto` would otherwise be allowed to sniff these, and a single
+# byte changed in the Gradle wrapper jar stops every clone from building.
+*.jar binary
+*.png binary
+*.jpg binary
+*.webp binary
+
+# GitHub reads these as the repository's language breakdown. Marking the
+# vendored jar as binary is not enough — `linguist-vendored` keeps the Gradle
+# wrapper out of the "Java 100%" pie chart.
+gradle/wrapper/gradle-wrapper.jar linguist-vendored

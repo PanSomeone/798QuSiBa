@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    One entry, for the exported log only. `cache-path` rather than `files-path`:
+    the log is a debugging artefact, and a cache directory is the one place the
+    system is allowed to reclaim when the phone runs out of room.
+-->
+<paths>
+    <cache-path
+        name="logs"
+        path="logs/" />
+</paths>

@@ -1,0 +1,34 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!--
+      The same mark as the launcher icon, drawn much smaller on purpose.
+
+      The splash screen and the launcher mask are not the same shape. This vector
+      is what `windowSplashScreenAnimatedIcon` points at, and the system already
+      scales that slot; handing it the launcher foreground made the drop span
+      nearly the whole canvas and read as a giant orange blob on a 2400px screen.
+      The 0.40 scale puts it inside the circle the splash mask cuts.
+    -->
+    <group
+        android:pivotX="54"
+        android:pivotY="54"
+        android:scaleX="0.40"
+        android:scaleY="0.40">
+
+        <path
+            android:fillColor="#FF6B35"
+            android:pathData="M54,24 C54,24 34,47.5 34,61.5 C34,72.6 42.9,81.5 54,81.5 C65.1,81.5 74,72.6 74,61.5 C74,47.5 54,24 54,24 Z" />
+
+        <path
+            android:fillColor="#0B1220"
+            android:pathData="M54,38 C54,38 43,53.6 43,61.9 C43,68 47.9,73 54,73 C60.1,73 65,68 65,61.9 C65,53.6 54,38 54,38 Z" />
+
+        <path
+            android:fillColor="#F2F5FA"
+            android:pathData="M30,52.2 L78,42.4 L80.6,49.6 L32.6,59.4 Z" />
+    </group>
+</vector>

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Debug-only manifest additions.
+
+    The ambience host is here rather than in `main` because it is a measurement
+    instrument: it exists so `FrameMetrics` can be read against the real render
+    pipeline without a test rule owning the frame clock. Shipping it would add an
+    exported activity to the app for no user-facing reason.
+
+    `tools:ignore` is deliberately absent — if this activity ever acquires an intent
+    filter, it should be because somebody decided it needed one.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+
+        <activity
+            android:name=".testing.AmbienceHostActivity"
+            android:exported="false"
+            android:theme="@style/Theme.KillHuiShengHuo" />
+
+    </application>
+
+</manifest>
