@@ -77,8 +77,8 @@ $qrParser = Slurp 'app\src\main\java\com\killhuishenghuo\data\model\DeviceQr.kt'
 
 Write-Host ""
 Write-Host "1. version" -ForegroundColor Cyan
-Check 'versionName is 1.2.3' ($gradle -match 'versionName\s*=\s*"1\.2\.3"') 'not found in app/build.gradle.kts'
-Check 'versionCode is 5'    ($gradle -match 'versionCode\s*=\s*5') `
+Check 'versionName is 1.2.4' ($gradle -match 'versionName\s*=\s*"1\.2\.4"') 'not found in app/build.gradle.kts'
+Check 'versionCode is 6'    ($gradle -match 'versionCode\s*=\s*6') `
     'Android refuses an install over an equal-or-lower code, and earlier builds are already on a phone'
 
 Write-Host ""
@@ -161,6 +161,14 @@ if ($results) {
     }
     Check "unit tests: $tests in $($results.Count) class(es), $bad failing" ($bad -eq 0) 'see app/build/test-results'
 }
+
+Write-Host ""
+Write-Host "6b. R8 kept the ML Kit scanner" -ForegroundColor Cyan
+# A separate script because it is the check that would have caught the bug this
+# release is about, and it is worth running on its own after any dependency bump.
+# Called as a child process so its `exit` cannot take this run with it.
+& powershell -NoProfile -ExecutionPolicy Bypass -File tools\verify-scan-keeps.ps1
+if ($LASTEXITCODE -ne 0) { $fail++ }
 
 Write-Host ""
 Write-Host "7. what the build actually produced" -ForegroundColor Cyan

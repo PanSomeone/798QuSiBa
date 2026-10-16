@@ -45,7 +45,7 @@ $env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
 .\gradlew.bat assembleDebug
 ```
 
-R8 后 release 约 9.4MB（其中约 5MB 是扫码用的 ML Kit 原生模型），debug 约 40MB；arm64 单 ABI，release 与 debug 的差别只在 ABI 与是否混淆。启动中位约 434–439ms；待机动画优化后 0 帧。基线配置文件手写 23 条，两遍校验通过；模拟器上启动提升在噪声内。
+R8 后 release 约 9.5MB（其中约 5MB 是扫码用的 ML Kit 原生模型），debug 约 40MB；arm64 单 ABI，release 与 debug 的差别只在 ABI 与是否混淆。启动中位约 434–439ms；待机动画优化后 0 帧。基线配置文件手写 23 条，两遍校验通过；模拟器上启动提升在噪声内。
 
 ## 代码结构
 
@@ -71,6 +71,7 @@ app/src/main/java/com/killhuishenghuo/
 - **扫码只发 arm64**：bundled ML Kit 每个 ABI 约 5MB，四个全留会让包涨到约 22MB，所以 32 位设备装不上（debug 变体额外保留 x86_64，只为模拟器能打开扫码页）。
 - **扫码那条路没在真机上走过**：解析、绑定与线格式都有单测钉着（`DeviceQrTest`、`GatewayContractTest`），扫码页在模拟器上打开过、也真的解码过一张二维码，但「对着机器上的贴纸扫」这一步只有你能验。
 - `dev/favo` 是否真能让设备出现在 `favos[]` 里，来自一个能用的第三方客户端，**尚未在本项目自己的账号上成功过一次**。
+- **R8 会删掉 ML Kit 扫码器的内部类**：它按名字在运行时拼装那些对象，R8 看不见，于是删掉——构建不报错、单测不报错，只有**压缩包**在打开相机的第一帧抛 `NullPointerException`（`benchmark` 包曾经因此 446ms 就自己退出）。`app/proguard-rules.pro` 里那几条 keep 规则就是为它写的，`tools/verify-scan-keeps.ps1` 每个构建都拿 `mapping.txt` 复核一次，代价约 +131KB。
 
 ## 反馈
 
