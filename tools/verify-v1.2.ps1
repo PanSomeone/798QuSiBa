@@ -149,7 +149,9 @@ foreach ($v in 'debug', 'benchmark', 'release') {
         }
     }
 }
-Write-Host "  (the two sha256 in README are for the files on the release page, not these)"
+Write-Host "  (this run's build outputs. The README quotes the three published files in the"
+Write-Host "   repo root instead. -fast.apk is not byte-reproducible -- see the README -- so its"
+Write-Host "   hash here will not match the published one even when the source is identical.)"
 
 Write-Host ""
 if ($fail -eq 0) { Write-Host "all checks passed" -ForegroundColor Green }

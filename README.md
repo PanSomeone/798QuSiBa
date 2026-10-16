@@ -147,17 +147,24 @@ $adb = "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe"
 Kotlin 编译器插件生成的序列化器**，所以 `proguard-rules.pro` 不需要任何 keep 规则；
 minSdk 26 也不需要 desugaring 之外的特殊处理。
 
-发布页上那三个产物（**目前仍是 v0.1.0 那一次构建**）的 sha256：
+发布页上那三个产物（**v1.2**，`versionCode 2` / `versionName 1.2`）的 sha256：
 
 ```
-惠生活去死吧-fast.apk             1,582,974 B  B7E5E40F7D469E005B791443C63E57CE2A5273D13DFA33243B9BE73A4BE49B3C
-惠生活去死吧-release-unsigned.apk 1,574,770 B  07DB01A05511310B70255CF2DA79DB856F3E5B8A68A71288442B36BD9CB8EE67
-惠生活去死吧-debug.apk           19,823,911 B  82473ED5CC78E7151CCB253B5FF9D623DB204586B5AD10E2525C2FE51776CCCD
+惠生活去死吧-fast.apk             1,582,978 B  4DE1A7B072553112BDB90F06AE502CFB7E6AC195876C0DE94BF77ABB3AAFF7B3
+惠生活去死吧-release-unsigned.apk 1,574,774 B  21EF61AB39D7FE28BDC5EFF7D2F00DAAAA9D8E115972CE5C11078353BFAFD200
+惠生活去死吧-debug.apk           19,745,711 B  D22633CE47B2B98A148C33005FC0CD310DF86F97021BCF78F0CFF199283E17AA
 ```
 
-**版本号是要进 APK 的，所以改一次 `versionCode` / `versionName` 这三个哈希就全变。** 上面那三个数
-只在发布页上那份文件被换掉之前有效；本地新构建出来的哈希与它们不同是正常的，不是构建坏了。
-（v1.2 的审核脚本跑完会把当次三个 APK 的实际体积与 sha256 打出来。）
+**这三个数是「这三份文件」的指纹，不是「这份源码」的指纹。** 体积能复现，`-fast.apk` 的哈希不能：
+`--rerun-tasks` 连做三次干净构建，同一个 commit、同一个 `versionName`，得到三个不同的 sha256
+（`1E17…` / `E15E…` / `4DE1…`），而三次的体积都是 1,582,978 B。差异落在 APK 的签名块里——第一个
+不同的字节在文件的 99.1% 处；把两个包按 zip 条目逐条比对，**88 个条目的内容完全相同**，也就是
+同一个程序、不同的容器。同一台机器上 `debug`（签名、不压缩）与 `release`（压缩、未签名）都能
+逐字节重建，只有**既压缩又签名**的 `benchmark` 不行。
+
+**这证明不了**包里代码有没有变（要证明那个得比条目，不是比文件）；它证明的是哈希只能用来核对
+**手里这份文件**是不是发布页上那份。`release` 是未签名的，你自己签名发布之后哈希必然又不一样，
+那是正常的。
 
 **实测状态**（本机模拟器 `Medium_Phone_API_37.0`，Android 17）：
 
@@ -167,9 +174,15 @@ minSdk 26 也不需要 desugaring 之外的特殊处理。
   `Window.OnFrameMetricsAvailableListener` 数真实帧，断言水关着时氛围动画一帧都不请求、
   水开着时请求。（不是 Compose 的测试时钟：一个「水开着就一直跑」的效果永远不 idle，
   `createComposeRule` 在退出时会等一个不会到来的空档。）
-- **三个变体都在模拟器上装过、点过。** `release` 用 debug key 签了一份装上去走查，冷启动
+- **v0.1.0 那次三个变体都在模拟器上装过、点过。** `release` 用 debug key 签了一份装上去走查，冷启动
   **连开两次都没有异常**——这条特意做过，因为 R8 断掉反射式序列化、以及下面那个探针的崩溃，
   都只会在压缩包里炸，构建期和 `debug` 包都是绿的。
+- **v1.2 的两个新入口在真包上点过。** `benchmark`（R8）与 `debug` 两个变体都装过、冷启动无异常；
+  设置 →「Star 这个项目」交给 Chrome 的 data 是 `https://github.com/PanSomeone/798QuSiBa`，
+  「去 GitHub 提 issue」交给它的是 `https://github.com/PanSomeone/798QuSiBa/issues/new`——读的是
+  `ActivityTaskManager` 的 `START u0 {act=android.intent.action.VIEW dat=…}` 和任务里的
+  `capturedLink=`，不是「按钮看起来能点」。关于那一节的版本行显示 `1.2 (2)`。
+  `release` 与 `benchmark` 是同一份代码（见上），所以验后者即验前者。
 - 冷启动 `am start -W`：`benchmark` 中位 **434–439ms**（5 次），
   `debug` 1996–2284ms（早前记录）。切页面连续 10 次来回：**1096 帧、Missed Vsync 0**、
   p50 17ms / p90 18ms、janky 2.55%（集中在每次切换的第一帧，因为它要组合整个新页面）。
