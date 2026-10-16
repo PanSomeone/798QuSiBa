@@ -52,6 +52,7 @@ $T_STAR_ASK     = U '\u7ED9\u6211(\u7684)?\u9879\u76EE\u52A0\u4E2A ?Star'  # the
 $T_PENDING      = U '\u5F85\u8865\u5145\u6E05\u5355'                # the retired notes file
 $T_BIND_ROW     = U '\u626B\u7801\u6DFB\u52A0\u8BBE\u5907'          # the scan-to-bind row label
 $T_BIND_BODY    = U '\u52A0\u8FDB\u6765\u7684\u8BBE\u5907\u5C31\u662F'  # the explainer that was cut
+$T_NO_CODE      = U '\u6682\u65F6\u6CA1\u6709\u626B\u5230\u4E8C\u7EF4\u7801'  # the sentence a cancel must produce
 
 # A top-level private function's body, so a check can ask what is in scope
 # inside it rather than anywhere in the file. The terminator is the first line
@@ -76,8 +77,8 @@ $qrParser = Slurp 'app\src\main\java\com\killhuishenghuo\data\model\DeviceQr.kt'
 
 Write-Host ""
 Write-Host "1. version" -ForegroundColor Cyan
-Check 'versionName is 1.2.2' ($gradle -match 'versionName\s*=\s*"1\.2\.2"') 'not found in app/build.gradle.kts'
-Check 'versionCode is 4'    ($gradle -match 'versionCode\s*=\s*4') `
+Check 'versionName is 1.2.3' ($gradle -match 'versionName\s*=\s*"1\.2\.3"') 'not found in app/build.gradle.kts'
+Check 'versionCode is 5'    ($gradle -match 'versionCode\s*=\s*5') `
     'Android refuses an install over an equal-or-lower code, and earlier builds are already on a phone'
 
 Write-Host ""
@@ -130,8 +131,10 @@ Check 'a camera is optional'    ($manifest -match '(?s)android\.hardware\.camera
 Check 'the bind row exists'     ($bindBlock -match [regex]::Escape($T_BIND_ROW)) 'the row the user asked for'
 Check 'no stray explainer'      ($bindBlock -notmatch [regex]::Escape($T_BIND_BODY)) `
     'the block is a label, two controls and a result line; the paragraph under the label told nobody anything'
-Check 'a cancel is reported'    ($bindBlock -match 'QRUserCanceled -> notice') `
+Check 'a cancel is reported'    (($bindBlock -match 'QRUserCanceled ->') -and ($bindBlock -match [regex]::Escape($T_NO_CODE))) `
     'the scanner has no timeout, so a silent QRUserCanceled is exactly what "it exited by itself and swallowed the try" looks like'
+Check 'the scan path is logged' (($bindBlock -match 'AppLog\.log\("Scan", "opened') -and ($bindBlock -match 'AppLog\.log\("Scan", "code ')) `
+    'a scan attempt that leaves no trace cannot be diagnosed from an exported log -- the first report of this had not one line about it'
 Check 'the scanner is portrait' ($manifest -match '(?s)QRScannerActivity.{0,200}screenOrientation="portrait"') `
     'a sideways phone gets a letterboxed preview and a needless activity recreation'
 Check 'the payload parser'      ($qrParser -match 'object DeviceQr') 'missing'

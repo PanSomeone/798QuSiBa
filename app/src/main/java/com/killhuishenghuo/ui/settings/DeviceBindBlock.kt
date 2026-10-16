@@ -33,6 +33,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import com.killhuishenghuo.core.log.AppLog
 import com.killhuishenghuo.ui.theme.Radii
 import com.killhuishenghuo.ui.theme.SettingsType
 import com.killhuishenghuo.ui.theme.Spacing
@@ -109,9 +110,21 @@ internal fun DeviceBindBlock(
     }
 
     val scanner = rememberLauncherForActivityResult(ScanCustomCode()) { result ->
+        // Every ending is logged, and the timestamps are the point: they are the
+        // only way to answer the question a real report could not — **how long
+        // was the scanner actually open**. The library has no timeout
+        // (`ScannerConfig` has no such field and the activity runs no timer), so
+        // "it comes back too fast" can only be one of these four endings, and
+        // which one it was is otherwise invisible. The log exported after the
+        // first report of this had not one line about the scan in it.
         when (result) {
             is QRResult.QRSuccess -> {
                 val scanned = result.content.rawValue.orEmpty().trim()
+                // The raw payload goes in on purpose. It is the one fact about a
+                // real sticker this project has never had — the parser was
+                // written from two other clients' source, not from one — and a
+                // log line is cheaper than another round of guessing.
+                AppLog.log("Scan", "code ${scanned.length} chars: $scanned")
                 if (scanned.isEmpty()) {
                     notice = "这个二维码是空的，换一个或手动输入设备号"
                 } else {
@@ -120,25 +133,34 @@ internal fun DeviceBindBlock(
                 }
             }
 
-            is QRResult.QRError -> notice =
-                "没扫出来：${result.exception.localizedMessage ?: "凑近一点、调亮屏幕再试"}"
+            is QRResult.QRError -> {
+                val cause = result.exception
+                AppLog.log("Scan", "error ${cause::class.java.simpleName}: ${cause.message}")
+                // Deliberately *not* the same sentence as "no code in view".
+                // QRError is what the library returns when the camera or ML Kit
+                // failed to set up — and it finishes the activity in that case,
+                // which is exactly what "it exits by itself" looks like from the
+                // outside. Telling the user to hold the phone closer would be
+                // advice about a problem they do not have.
+                notice = "相机没能打开，再点一次试试；一直不行就把日志发我"
+            }
 
-            // The one that used to say nothing at all, and the reason a scanner
-            // that has no timeout still looked like it "gave up": `RESULT_CANCELED`
-            // is what comes back when the scanner closes without a code — a
-            // brushed X, a back gesture, or the system reclaiming the activity
-            // while the user walks over to the machine. Silence there reads as
-            // "it exited on its own and swallowed the attempt", so it says what
-            // happened and leaves the row ready for another try.
-            QRResult.QRUserCanceled -> notice = "暂时没有扫到二维码，凑近一点再试"
+            QRResult.QRUserCanceled -> {
+                AppLog.log("Scan", "canceled (closed with no code)")
+                notice = "暂时没有扫到二维码，凑近一点再试"
+            }
 
-            QRResult.QRMissingPermission -> notice = "没有相机权限。可以在系统设置里打开，或直接把二维码内容粘进来"
+            QRResult.QRMissingPermission -> {
+                AppLog.log("Scan", "missing camera permission")
+                notice = "没有相机权限。可以在系统设置里打开，或直接把二维码内容粘进来"
+            }
         }
     }
 
     val cameraPermission = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { granted ->
+        AppLog.log("Scan", "camera permission granted=$granted")
         if (granted) scanner.launch(config) else notice = "没有相机权限。可以手动输入设备号"
     }
 
@@ -164,6 +186,7 @@ internal fun DeviceBindBlock(
                     context,
                     Manifest.permission.CAMERA,
                 ) == PackageManager.PERMISSION_GRANTED
+                AppLog.log("Scan", "opened (permission=$granted)")
                 if (granted) scanner.launch(config) else cameraPermission.launch(Manifest.permission.CAMERA)
             },
             enabled = !isBinding,
