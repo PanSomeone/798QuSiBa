@@ -123,13 +123,16 @@ internal fun DeviceBindBlock(
             is QRResult.QRError -> notice =
                 "没扫出来：${result.exception.localizedMessage ?: "凑近一点、调亮屏幕再试"}"
 
-            // The one that must not be silent: without this the button looks
-            // broken on a phone where the permission was denied once and never
-            // asked again.
-            QRResult.QRMissingPermission -> notice = "没有相机权限。可以在系统设置里打开，或直接把二维码内容粘进来"
+            // The one that used to say nothing at all, and the reason a scanner
+            // that has no timeout still looked like it "gave up": `RESULT_CANCELED`
+            // is what comes back when the scanner closes without a code — a
+            // brushed X, a back gesture, or the system reclaiming the activity
+            // while the user walks over to the machine. Silence there reads as
+            // "it exited on its own and swallowed the attempt", so it says what
+            // happened and leaves the row ready for another try.
+            QRResult.QRUserCanceled -> notice = "暂时没有扫到二维码，凑近一点再试"
 
-            // Nothing to report for a cancel: the user knows they cancelled.
-            QRResult.QRUserCanceled -> Unit
+            QRResult.QRMissingPermission -> notice = "没有相机权限。可以在系统设置里打开，或直接把二维码内容粘进来"
         }
     }
 
@@ -153,11 +156,6 @@ internal fun DeviceBindBlock(
             text = "扫码添加设备",
             style = SettingsType.label,
             color = colors.ink,
-        )
-        Text(
-            text = "扫机器上的二维码，或把二维码内容粘进来。加进来的设备就是按钮控制的那一台。",
-            style = SettingsType.detail,
-            color = colors.inkMuted,
         )
 
         OutlinedButton(

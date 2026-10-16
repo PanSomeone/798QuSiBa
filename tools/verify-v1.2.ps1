@@ -51,6 +51,7 @@ $T_ASK_ISSUE    = U '\u53CD\u9988\u95EE\u9898 / \u63D0 issue'      # the issue r
 $T_STAR_ASK     = U '\u7ED9\u6211(\u7684)?\u9879\u76EE\u52A0\u4E2A ?Star'  # the README ask
 $T_PENDING      = U '\u5F85\u8865\u5145\u6E05\u5355'                # the retired notes file
 $T_BIND_ROW     = U '\u626B\u7801\u6DFB\u52A0\u8BBE\u5907'          # the scan-to-bind row label
+$T_BIND_BODY    = U '\u52A0\u8FDB\u6765\u7684\u8BBE\u5907\u5C31\u662F'  # the explainer that was cut
 
 # A top-level private function's body, so a check can ask what is in scope
 # inside it rather than anywhere in the file. The terminator is the first line
@@ -75,9 +76,9 @@ $qrParser = Slurp 'app\src\main\java\com\killhuishenghuo\data\model\DeviceQr.kt'
 
 Write-Host ""
 Write-Host "1. version" -ForegroundColor Cyan
-Check 'versionName is 1.2.1' ($gradle -match 'versionName\s*=\s*"1\.2\.1"') 'not found in app/build.gradle.kts'
-Check 'versionCode is 3'    ($gradle -match 'versionCode\s*=\s*3') `
-    'Android refuses an install over an equal-or-lower code, and 1.2 (code 2) is already on a phone'
+Check 'versionName is 1.2.2' ($gradle -match 'versionName\s*=\s*"1\.2\.2"') 'not found in app/build.gradle.kts'
+Check 'versionCode is 4'    ($gradle -match 'versionCode\s*=\s*4') `
+    'Android refuses an install over an equal-or-lower code, and earlier builds are already on a phone'
 
 Write-Host ""
 Write-Host "2. the links exist and agree" -ForegroundColor Cyan
@@ -127,6 +128,12 @@ Check 'CAMERA is declared'      ($manifest -match 'android\.permission\.CAMERA')
 Check 'a camera is optional'    ($manifest -match '(?s)android\.hardware\.camera.{0,120}required="false"') `
     'a phone without one must still install and type the code by hand'
 Check 'the bind row exists'     ($bindBlock -match [regex]::Escape($T_BIND_ROW)) 'the row the user asked for'
+Check 'no stray explainer'      ($bindBlock -notmatch [regex]::Escape($T_BIND_BODY)) `
+    'the block is a label, two controls and a result line; the paragraph under the label told nobody anything'
+Check 'a cancel is reported'    ($bindBlock -match 'QRUserCanceled -> notice') `
+    'the scanner has no timeout, so a silent QRUserCanceled is exactly what "it exited by itself and swallowed the try" looks like'
+Check 'the scanner is portrait' ($manifest -match '(?s)QRScannerActivity.{0,200}screenOrientation="portrait"') `
+    'a sideways phone gets a letterboxed preview and a needless activity recreation'
 Check 'the payload parser'      ($qrParser -match 'object DeviceQr') 'missing'
 Check 'the device list is read' ($settings -match 'DeviceBindBlock\(') 'the block is not wired into settings'
 Check 'publish is arm64 only'   ($gradle -match 'abiFilters \+= "arm64-v8a"') `

@@ -36,6 +36,23 @@
         </activity>
 
         <!--
+            扫码页. The library declares this itself; what is added here is the
+            orientation.
+
+            The scanner's overlay is built for a portrait frame, and `behind`
+            (the library's default) lets it follow whatever the phone is doing —
+            so a phone turned sideways while walking to the machine gets a
+            letterboxed preview. Locking it also removes the activity recreation
+            that comes with a rotation, which is one of the ways a scan ends
+            without a code.
+        -->
+        <activity
+            android:name="io.github.g00fy2.quickie.QRScannerActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            tools:replace="android:screenOrientation" />
+
+        <!--
             Exists for one file: the log the user exports from settings and sends
             back. Authority is derived from the package name so a debug and a
             release build on the same phone cannot collide.
