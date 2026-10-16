@@ -73,6 +73,25 @@ data class HotWaterUiState(
     /** True when the last device fetch failed and there is nothing to show. */
     val deviceLoadFailed: Boolean = false,
     /**
+     * A scan is being exchanged for a device on this account right now.
+     *
+     * Its own flag rather than reusing `isBusy`, which belongs to the valve: a
+     * bind in flight must not disable the button on the other screen, and a valve
+     * in flight must not make the bind row spin.
+     */
+    val isBinding: Boolean = false,
+    /**
+     * The sentence the bind block shows after an attempt — success or failure.
+     *
+     * A separate field from [errorMessage] because most of what it says is not an
+     * error: "已添加，按钮现在控制它" is the outcome the user was after, and
+     * routing that through a field named `errorMessage` is how a success ends up
+     * rendered in red under the wrong heading.
+     */
+    val bindMessage: String? = null,
+    /** Whether [bindMessage] is a failure. Success and failure are both sentences. */
+    val bindFailed: Boolean = false,
+    /**
      * `code: -99` came back, so the stored token is dead. The screen says so and
      * points at settings rather than offering a retry that would fail the same
      * way.

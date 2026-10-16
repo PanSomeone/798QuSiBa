@@ -11,6 +11,7 @@ import com.killhuishenghuo.data.model.LoginData
 import com.killhuishenghuo.data.model.LoginToken
 import com.killhuishenghuo.data.model.MasterData
 import com.killhuishenghuo.data.model.DeviceStatusData
+import com.killhuishenghuo.data.model.QrUseData
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import okhttp3.MediaType.Companion.toMediaType
@@ -119,6 +120,10 @@ interface GatewayClient {
     suspend fun start(did: String, ptype: Int, args: String): Response<ApiEnvelope<JsonElement>>
 
     suspend fun stop(did: String): Response<ApiEnvelope<JsonElement>>
+
+    suspend fun qrUse(id: String): Response<ApiEnvelope<QrUseData>>
+
+    suspend fun favourite(did: String, remove: Boolean): Response<ApiEnvelope<JsonElement>>
 }
 
 /** [GatewayClient] over the Retrofit interface. */
@@ -149,6 +154,14 @@ class RetrofitGatewayClient(
 
     override suspend fun stop(did: String): Response<ApiEnvelope<JsonElement>> =
         api.stopDevice(did = did)
+
+    override suspend fun qrUse(id: String): Response<ApiEnvelope<QrUseData>> = api.qrUse(id = id)
+
+    override suspend fun favourite(did: String, remove: Boolean): Response<ApiEnvelope<JsonElement>> =
+        api.favouriteDevice(
+            did = did,
+            remove = if (remove) ApiConstants.FAVO_REMOVE else ApiConstants.FAVO_ADD,
+        )
 }
 
 /** Unused import guard: keeps [LoginToken] referenced for readers of the graph. */

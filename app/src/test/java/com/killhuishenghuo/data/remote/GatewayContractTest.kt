@@ -163,11 +163,41 @@ class GatewayContractTest {
     }
 
     @Test
+    fun `qr-use asks for the scanned id under the device scope`() = runBlocking {
+        enqueueJson("""{"code":0,"data":{"dev":{"id":"D1"},"qr":{"type":3}}}""")
+
+        gateway().qrUse(id = "AbCd1234")
+
+        val request = takeRequest()
+        assertEquals("GET", request.method)
+        assertEquals("/api/v1/qr/use", path(request))
+        assertEquals(mapOf("id" to "AbCd1234"), params(request))
+        assertClientHeaders(request)
+    }
+
+    @Test
+    fun `favourite adds the device rather than removing it`() = runBlocking {
+        enqueueJson("""{"code":0}""")
+
+        gateway().favourite(did = "865137068739782", remove = false)
+
+        val request = takeRequest()
+        assertEquals("GET", request.method)
+        assertEquals("/api/v1/dev/favo", path(request))
+        // `remove=0` is the whole feature: it is what puts a device into the
+        // `favos[]` array that `ui/app/master` answers with, and that array is the
+        // only device list this app can read. `remove=1` takes a device off the
+        // account — the two are one boolean apart, so the boolean is asserted and
+        // not assumed.
+        assertEquals(mapOf("did" to "865137068739782", "remove" to "0"), params(request))
+        assertClientHeaders(request)
+    }
+
+    @Test
     fun `stop carries did and rcp only`() = runBlocking {
         enqueueJson("""{"code":0}""")
 
         gateway().stop(did = "D1")
-
         val request = takeRequest()
         assertEquals("GET", request.method)
         assertEquals("/api/v1/dev/end", path(request))

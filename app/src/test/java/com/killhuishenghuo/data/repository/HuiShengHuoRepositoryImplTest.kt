@@ -15,6 +15,8 @@ import com.killhuishenghuo.data.model.LoginData
 import com.killhuishenghuo.data.model.MasterData
 import com.killhuishenghuo.data.model.Outcome
 import com.killhuishenghuo.data.model.Part
+import com.killhuishenghuo.data.model.QrDeviceRef
+import com.killhuishenghuo.data.model.QrUseData
 import com.killhuishenghuo.data.remote.LoginRequest
 import com.killhuishenghuo.data.remote.SmsCodeRequest
 import kotlinx.coroutines.Dispatchers
@@ -272,6 +274,91 @@ class HuiShengHuoRepositoryImplTest {
         assertEquals(AppError.Unauthorized, repository().refreshStatus(Device(deviceId = "d1")).errorOrNull())
     }
 
+    // --------------------------------------------------------- bindScannedDevice
+
+    /** A `/master` answer whose `favos[]` holds exactly [ids]. */
+    private fun masterWith(vararg ids: String): () -> Response<ApiEnvelope<MasterData>> = {
+        envelope(
+            MasterData(
+                account = Account(id = "a1", name = "13000000000"),
+                favos = ids.map { Favo(id = it, name = "设备", bm = Bm(dtype = 6), gene = Gene(status = 0)) },
+            ),
+        )
+    }
+
+    @Test
+    fun `a numeric sticker is favourited as a device id, without asking qr-use`() = runBlocking {
+        gateway.masterAnswer = masterWith("865137068739782")
+
+        val device = repository().bindScannedDevice("865137068739782").getOrNull()
+
+        assertEquals("865137068739782", device?.deviceId)
+        assertEquals(listOf(FakeGateway.FavouriteCall("865137068739782", false)), gateway.favouriteCalls)
+        assertTrue("a code that already is a device id needs no exchange", gateway.qrUseCalls.isEmpty())
+    }
+
+    @Test
+    fun `a code that identifies itself is exchanged before it is favourited`() = runBlocking {
+        gateway.qrUseAnswer = { envelope(QrUseData(device = QrDeviceRef(id = "865137068739782"))) }
+        gateway.masterAnswer = masterWith("865137068739782")
+
+        val device = repository().bindScannedDevice("https://i.ilife798.com/q/1/AbCd1234").getOrNull()
+
+        assertEquals("865137068739782", device?.deviceId)
+        assertEquals(listOf("AbCd1234"), gateway.qrUseCalls)
+        assertEquals(listOf(FakeGateway.FavouriteCall("865137068739782", false)), gateway.favouriteCalls)
+    }
+
+    @Test
+    fun `a numeric code the server refuses as a device is tried as a qr id`() = runBlocking {
+        // 两套解释互为兜底：数字串最常见的样子是设备号，但它也可能是一个要拿去
+        // qr/use 换的 id，而这两种情况从二维码本身看不出来。第一次收藏被拒，
+        // 换来的设备号再收藏一次就成功 —— 这正是兜底存在的意义。
+        var attempt = 0
+        gateway.favouriteAnswer = {
+            attempt++
+            if (attempt == 1) envelope<JsonElement>(code = -2, msg = "无效设备") else envelope<JsonElement>()
+        }
+        gateway.qrUseAnswer = { envelope(QrUseData(device = QrDeviceRef(id = "999888777666"))) }
+        gateway.masterAnswer = masterWith("999888777666")
+
+        val device = repository().bindScannedDevice("123456789012").getOrNull()
+
+        assertEquals("999888777666", device?.deviceId)
+        assertEquals(listOf("123456789012"), gateway.qrUseCalls)
+        assertEquals(listOf("123456789012", "999888777666"), gateway.favouriteCalls.map { it.did })
+    }
+
+    @Test
+    fun `success means the device is in the list, not that the server answered code zero`() = runBlocking {
+        // A real account was found in exactly this state: `/master` answering,
+        // `favos` empty. "The server accepted the favourite" and "the user can
+        // open this device" are two different claims.
+        gateway.masterAnswer = masterWith("some-other-device")
+
+        val outcome = repository().bindScannedDevice("865137068739782")
+
+        assertNull(outcome.getOrNull())
+        assertTrue(outcome.errorOrNull() is AppError.Unexpected)
+    }
+
+    @Test
+    fun `an unreadable sticker fails without calling the gateway at all`() = runBlocking {
+        val outcome = repository().bindScannedDevice("随便一句话")
+
+        assertNull(outcome.getOrNull())
+        assertTrue(gateway.favouriteCalls.isEmpty())
+        assertTrue(gateway.qrUseCalls.isEmpty())
+    }
+
+    @Test
+    fun `a dead session during binding is reported as a session problem`() = runBlocking {
+        gateway.favouriteAnswer = { envelope<JsonElement>(code = -99) }
+        gateway.qrUseAnswer = { envelope<QrUseData>(code = -99) }
+
+        assertEquals(AppError.Unauthorized, repository().bindScannedDevice("865137068739782").errorOrNull())
+    }
+
     // ------------------------------------------------------------------ fakes
 
     /**
@@ -287,10 +374,14 @@ class HuiShengHuoRepositoryImplTest {
         var loginAnswer: () -> Response<ApiEnvelope<LoginData>> = { envelope(LoginData()) }
         var smsAnswer: () -> Response<ApiEnvelope<JsonElement>> = { envelope<JsonElement>() }
         var captchaAnswer: () -> Response<ResponseBody> = { httpError(404) }
+        var qrUseAnswer: () -> Response<ApiEnvelope<QrUseData>> = { envelope(QrUseData()) }
+        var favouriteAnswer: () -> Response<ApiEnvelope<JsonElement>> = { envelope<JsonElement>() }
 
         val startCalls = mutableListOf<StartCall>()
         val stopCalls = mutableListOf<String>()
         val statusCalls = mutableListOf<String>()
+        val qrUseCalls = mutableListOf<String>()
+        val favouriteCalls = mutableListOf<FavouriteCall>()
 
         override suspend fun captcha(key: String): Response<ResponseBody> = captchaAnswer()
 
@@ -315,7 +406,19 @@ class HuiShengHuoRepositoryImplTest {
             return stopAnswer()
         }
 
+        override suspend fun qrUse(id: String): Response<ApiEnvelope<QrUseData>> {
+            qrUseCalls += id
+            return qrUseAnswer()
+        }
+
+        override suspend fun favourite(did: String, remove: Boolean): Response<ApiEnvelope<JsonElement>> {
+            favouriteCalls += FavouriteCall(did = did, remove = remove)
+            return favouriteAnswer()
+        }
+
         data class StartCall(val did: String, val ptype: Int, val args: String)
+
+        data class FavouriteCall(val did: String, val remove: Boolean)
     }
 
     private companion object {

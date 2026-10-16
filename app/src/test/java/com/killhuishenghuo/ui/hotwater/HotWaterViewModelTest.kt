@@ -775,6 +775,9 @@ class HotWaterViewModelTest {
 
         override suspend fun refreshStatus(device: Device): Outcome<Device> = Outcome.Success(device)
 
+        override suspend fun bindScannedDevice(code: String): Outcome<Device> =
+            throw NotImplementedError("the hot-water screen does not bind devices")
+
         data class OpenCall(val device: Device, val args: String, val ptype: Int)
 
         data class CloseCall(val device: Device)

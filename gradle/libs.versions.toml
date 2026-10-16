@@ -19,6 +19,13 @@ androidxTestRunner = "1.7.0"
 # so every Compose test fails with `NoSuchMethodException` before reaching a single
 # assertion. This line is the whole fix for running tests on API 37.
 espresso = "3.7.0"
+# 扫码：CameraX + ML Kit（bundled）。bundled 而不是 play-services 版是刻意的 ——
+# 这台机器上的真机在国内，Google Play 服务不保证存在，而解绑一个扫不出来的二维码
+# 是没法排查的。代价是每个 ABI 约 2.7MB 的原生模型，见 app/build.gradle.kts 的 abiFilters。
+quickie = "1.18.1"
+# Quickie 的 AAR 元数据里写着「requires core library desugaring」，所以这一项不是
+# 可选的：不开 desugaring，`:app:checkDebugAarMetadata` 会直接失败。
+desugarJdkLibs = "2.1.5"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -48,6 +55,8 @@ kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-
 kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutinesTest" }
 
 junit = { group = "junit", name = "junit", version.ref = "junit" }
+quickie-bundled = { group = "com.github.T8RIN.QuickieExtended", name = "quickie-bundled", version.ref = "quickie" }
+desugar-jdk-libs = { group = "com.android.tools", name = "desugar_jdk_libs", version.ref = "desugarJdkLibs" }
 androidx-test-runner = { group = "androidx.test", name = "runner", version.ref = "androidxTestRunner" }
 androidx-test-ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxTestJunit" }
 androidx-test-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espresso" }

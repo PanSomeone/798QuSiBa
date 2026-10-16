@@ -66,13 +66,26 @@ android {
         applicationId = "com.killhuishenghuo"
         minSdk = 26
         targetSdk = 37
-        versionCode = 2
-        versionName = "1.2"
+        versionCode = 3
+        versionName = "1.2.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         buildConfigField("String", "BASE_URL", "\"$huishuiBaseUrl\"")
         buildConfigField("boolean", "BASE_URL_CONFIGURED", baseUrlIsConfigured.toString())
+
+        /**
+         * 扫码用的 ML Kit 是 **bundled** 模型（原生库，arm64 一份就是 5.0MB），所以
+         * ABI 直接决定包有多大：四个全留约 22MB，只留 arm64 约 7MB。
+         *
+         * 默认值就是发布值（arm64）。`x86_64` 只在 debug 变体上加回来，见文件末尾的
+         * `androidComponents` —— 那一条不是给用户的，是给开发的：模拟器是 x86_64，
+         * 砍掉它扫码页在模拟器上会以 `UnsatisfiedLinkError` 结束，而那正是这个功能
+         * 在交付前唯一能被打开看一眼的地方。
+         */
+        ndk {
+            abiFilters += "arm64-v8a"
+        }
     }
 
     /**
@@ -171,6 +184,20 @@ android {
          */
         debug {
             isMinifyEnabled = false
+
+            /**
+             * 模拟器是 x86_64，而扫码页在交付前唯一能被打开看一眼的地方就是模拟器，
+             * 所以这个 ABI 只加在 debug 上。
+             *
+             * 这必须是「加」而不是「覆盖」：AGP 把 `defaultConfig` 与 buildType 的
+             * `abiFilters` **取并集**，所以 `defaultConfig` 里只能放最小值（arm64），
+             * 想要更多 ABI 的变体自己往上加。反过来做是行不通的 —— 第一版把两个 ABI
+             * 都放进 `defaultConfig`、再在 `release` 里 `abiFilters.clear()` 想砍掉
+             * x86_64，结果 release 里两个 ABI 都在，包 15.4MB。
+             */
+            ndk {
+                abiFilters += "x86_64"
+            }
         }
 
         release {
@@ -205,6 +232,13 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+
+        /**
+         * 由扫码库逼出来的：Quickie 的 AAR 元数据要求 core library desugaring，
+         * 不开这一行 `:app:checkDebugAarMetadata` 就失败。minSdk 是 26，本来几乎
+         * 用不到它 —— 这里开着的唯一原因是那一条依赖声明。
+         */
+        isCoreLibraryDesugaringEnabled = true
     }
 
     buildFeatures {
@@ -234,6 +268,8 @@ kotlin {
 }
 
 dependencies {
+    coreLibraryDesugaring(libs.desugar.jdk.libs)
+
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.runtime.compose)
@@ -254,6 +290,10 @@ dependencies {
     implementation(libs.okhttp.logging)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.coroutines.android)
+
+    // 扫码：CameraX + ML Kit，只用来读设备上的那个二维码。这是本项目唯一一个
+    // 「为了一个功能而显著改变包体积」的依赖（约 +2.7MB/ABI，见 defaultConfig）。
+    implementation(libs.quickie.bundled)
 
     testImplementation(libs.junit)
     testImplementation(libs.okhttp.mockwebserver)

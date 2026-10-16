@@ -10,6 +10,7 @@ import com.killhuishenghuo.data.model.LoginData
 import com.killhuishenghuo.data.model.LoginToken
 import com.killhuishenghuo.data.model.MasterData
 import com.killhuishenghuo.data.model.Outcome
+import com.killhuishenghuo.data.model.QrUseData
 import com.killhuishenghuo.data.remote.LoginRequest
 import com.killhuishenghuo.data.remote.SmsCodeRequest
 import kotlinx.coroutines.Dispatchers
@@ -313,6 +314,12 @@ class AuthRepositoryImplTest {
 
         override suspend fun stop(did: String): Response<ApiEnvelope<JsonElement>> =
             throw NotImplementedError("sign-in does not close valves")
+
+        override suspend fun qrUse(id: String): Response<ApiEnvelope<QrUseData>> =
+            throw NotImplementedError("sign-in does not resolve scanned codes")
+
+        override suspend fun favourite(did: String, remove: Boolean): Response<ApiEnvelope<JsonElement>> =
+            throw NotImplementedError("sign-in does not bind devices")
     }
 
     private companion object {

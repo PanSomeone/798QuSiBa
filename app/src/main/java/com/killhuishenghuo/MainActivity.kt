@@ -255,6 +255,7 @@ private fun AppRoot() {
                     // `state.devices`.
                     state = hotWater.uiState,
                     onDeviceSelected = hotWater::selectDevice,
+                    onBindScanned = hotWater::bindScannedDevice,
                     onThemeChange = { picked ->
                         AppLog.log("Theme", "mode=$picked")
                         preferences.themeMode = picked
@@ -381,6 +382,7 @@ private fun SettingsHost(
     dark: Boolean,
     state: StateFlow<HotWaterUiState>,
     onDeviceSelected: (Device) -> Unit,
+    onBindScanned: (String) -> Unit,
     onThemeChange: (ThemeMode) -> Unit,
     onSignOut: () -> Unit,
 ) {
@@ -408,6 +410,10 @@ private fun SettingsHost(
         devices = hotWaterState.devices,
         selected = hotWaterState.selected,
         onDeviceSelected = onDeviceSelected,
+        isBinding = hotWaterState.isBinding,
+        bindMessage = hotWaterState.bindMessage,
+        bindFailed = hotWaterState.bindFailed,
+        onBindScanned = onBindScanned,
         onSignOut = {
             viewModel.signOut()
             onSignOut()

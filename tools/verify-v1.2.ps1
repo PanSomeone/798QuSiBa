@@ -50,6 +50,7 @@ $T_FEEDBACK     = U '\u53CD\u9988'                                 # feedback
 $T_ASK_ISSUE    = U '\u53CD\u9988\u95EE\u9898 / \u63D0 issue'      # the issue row label
 $T_STAR_ASK     = U '\u7ED9\u6211(\u7684)?\u9879\u76EE\u52A0\u4E2A ?Star'  # the README ask
 $T_PENDING      = U '\u5F85\u8865\u5145\u6E05\u5355'                # the retired notes file
+$T_BIND_ROW     = U '\u626B\u7801\u6DFB\u52A0\u8BBE\u5907'          # the scan-to-bind row label
 
 # A top-level private function's body, so a check can ask what is in scope
 # inside it rather than anywhere in the file. The terminator is the first line
@@ -68,11 +69,15 @@ $gradle   = Slurp 'app\build.gradle.kts'
 $links    = Slurp 'app\src\main\java\com\killhuishenghuo\core\ProjectLinks.kt'
 $settings = Slurp 'app\src\main\java\com\killhuishenghuo\ui\settings\SettingsScreen.kt'
 $readme   = Slurp 'README.md'
+$manifest = Slurp 'app\src\main\AndroidManifest.xml'
+$bindBlock = Slurp 'app\src\main\java\com\killhuishenghuo\ui\settings\DeviceBindBlock.kt'
+$qrParser = Slurp 'app\src\main\java\com\killhuishenghuo\data\model\DeviceQr.kt'
 
 Write-Host ""
 Write-Host "1. version" -ForegroundColor Cyan
-Check 'versionName is 1.2'  ($gradle -match 'versionName\s*=\s*"1\.2"')  'not found in app/build.gradle.kts'
-Check 'versionCode is 2'    ($gradle -match 'versionCode\s*=\s*2')      'Android refuses an install over an equal-or-lower code'
+Check 'versionName is 1.2.1' ($gradle -match 'versionName\s*=\s*"1\.2\.1"') 'not found in app/build.gradle.kts'
+Check 'versionCode is 3'    ($gradle -match 'versionCode\s*=\s*3') `
+    'Android refuses an install over an equal-or-lower code, and 1.2 (code 2) is already on a phone'
 
 Write-Host ""
 Write-Host "2. the links exist and agree" -ForegroundColor Cyan
@@ -114,6 +119,20 @@ $targets = [regex]::Matches($readme, '\]\(([^)#]+)\)') |
     Sort-Object -Unique
 $missing = @($targets | Where-Object { -not (Test-Path ($_ -replace '/$', '')) })
 Check "all $($targets.Count) relative link target(s) exist" ($missing.Count -eq 0) ("missing: " + ($missing -join ', '))
+
+Write-Host ""
+Write-Host "5b. scan to bind a device (1.2.1)" -ForegroundColor Cyan
+Check 'CAMERA is declared'      ($manifest -match 'android\.permission\.CAMERA') `
+    'the scanner cannot ask for a camera the manifest never declares'
+Check 'a camera is optional'    ($manifest -match '(?s)android\.hardware\.camera.{0,120}required="false"') `
+    'a phone without one must still install and type the code by hand'
+Check 'the bind row exists'     ($bindBlock -match [regex]::Escape($T_BIND_ROW)) 'the row the user asked for'
+Check 'the payload parser'      ($qrParser -match 'object DeviceQr') 'missing'
+Check 'the device list is read' ($settings -match 'DeviceBindBlock\(') 'the block is not wired into settings'
+Check 'publish is arm64 only'   ($gradle -match 'abiFilters \+= "arm64-v8a"') `
+    'the bundled ML Kit model is ~5MB per ABI; a release with four of them is ~22MB'
+Check 'debug keeps x86_64'      ($gradle -match 'abiFilters \+= "x86_64"') `
+    'without it the scanner ends in UnsatisfiedLinkError on the emulator, which is the only place it can be opened before shipping'
 
 Write-Host ""
 Write-Host "6. build and test" -ForegroundColor Cyan

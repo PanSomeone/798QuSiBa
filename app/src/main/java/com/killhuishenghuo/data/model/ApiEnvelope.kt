@@ -112,6 +112,33 @@ data class DeviceStatusData(
     @SerialName("device") val device: DeviceStateNode? = null,
 )
 
+/**
+ * What `qr/use` answers: the device a scanned code belongs to.
+ *
+ * Only `dev.id` is used — that is the `did` every device call takes. `qr.type`
+ * is read for the log and **deliberately not gated on**: a working client of the
+ * same product accepts two type values (device, door lock) and refuses the rest,
+ * but those two constants were read off its source rather than observed on the
+ * gateway, and refusing a legitimate sticker because its type number is not in a
+ * list this client guessed would be a worse failure than trying a call the
+ * server can refuse on its own.
+ */
+@Serializable
+data class QrUseData(
+    @SerialName("dev") val device: QrDeviceRef? = null,
+    @SerialName("qr") val qr: QrInfo? = null,
+)
+
+@Serializable
+data class QrDeviceRef(
+    @SerialName("id") val id: String = "",
+)
+
+@Serializable
+data class QrInfo(
+    @SerialName("type") val type: Int? = null,
+)
+
 @Serializable
 data class DeviceStateNode(
     @SerialName("status") val status: Int = 0,

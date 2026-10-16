@@ -146,6 +146,73 @@ class HotWaterViewModel(
     }
 
     /**
+     * Adds the machine behind a scanned sticker to this account.
+     *
+     * The account starts with no devices at all in `favos[]` — a real one did,
+     * and the screen's only honest answer to it used to be 还没有可用的设备. This
+     * is the way out of that state, and it is the same thing the official app
+     * does when it scans the same sticker.
+     *
+     * The bound device becomes the **selected** one: the user scanned it because
+     * they want to use it, and leaving the button pointing at whatever was
+     * selected before (or at nothing) would make the feature end in one more
+     * tap that the user has no reason to expect.
+     *
+     * [code] is the raw text of the scan. Everything about which kind of code it
+     * is belongs to the repository — by the time this returns, the question has
+     * already been settled by the server.
+     */
+    fun bindScannedDevice(code: String) {
+        if (_uiState.value.isBinding) return
+
+        _uiState.update { it.copy(isBinding = true, bindMessage = null, errorMessage = null) }
+
+        viewModelScope.launch {
+            when (val result = repository.bindScannedDevice(code)) {
+                is Outcome.Success -> {
+                    AppLog.log(
+                        "Bind",
+                        "bound device=${result.value.deviceId} name=${result.value.displayName} " +
+                            "kind=${result.value.kind.name}",
+                    )
+                    preferences.selectedDeviceId = result.value.deviceId
+                    _uiState.update {
+                        it.copy(
+                            isBinding = false,
+                            selected = result.value,
+                            bindMessage = "已添加「${result.value.displayName}」，按钮现在控制它",
+                            bindFailed = false,
+                        )
+                    }
+                    // The repository already read the list once to prove the
+                    // device is in it; this is the read that puts the whole list
+                    // — every other device included — back on the settings screen.
+                    refreshDevices()
+                }
+
+                is Outcome.Failure -> {
+                    AppLog.log(
+                        "Bind",
+                        "failed expired=${result.error is AppError.Unauthorized} " +
+                            "error=${result.error::class.simpleName}",
+                    )
+                    _uiState.update {
+                        it.copy(
+                            isBinding = false,
+                            bindMessage = result.error.toChinese(),
+                            bindFailed = true,
+                            // A scan that ends in a dead session is a session
+                            // problem like any other, and the root already knows
+                            // how to act on that flag.
+                            sessionExpired = result.error is AppError.Unauthorized,
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    /**
      * The one action: open the valve if it is closed, close it if it is open.
      *
      * One entry point rather than two, because the button must never offer the

@@ -88,6 +88,7 @@ object ApiConstants {
         PATH_DEVICE_DETAIL,
         PATH_DEVICE_START,
         PATH_DEVICE_END,
+        PATH_DEVICE_FAVO,
         PATH_QR_USE,
         -> APPLICATION_TYPE_DEVICE
 
@@ -128,6 +129,16 @@ object ApiConstants {
     /** `GET` -> device can be resolved from a scanned QR payload. Query: `id`. */
     const val PATH_QR_USE = "qr/use"
 
+    /**
+     * `GET` -> adds or removes this account's favourite device. Query: `did`, `remove`.
+     *
+     * This is the "add device" call: `remove=0` puts a device into the `favos[]`
+     * array that [PATH_MASTER] answers with, which is the only list this app can
+     * see. Read out of a working client of the same product, where it is named
+     * plainly: 添加或移除账户收藏设备.
+     */
+    const val PATH_DEVICE_FAVO = "dev/favo"
+
     // ---------------------------------------------------------- parameters
 
     const val PARAM_DID = "did"
@@ -137,6 +148,18 @@ object ApiConstants {
     const val PARAM_ARGS = "args"
     const val PARAM_RCP = "rcp"
     const val PARAM_CNT = "cnt"
+
+    /** `qr/use` takes the id the scan produced. */
+    const val PARAM_ID = "id"
+
+    /** `dev/favo` takes `remove`: see [FAVO_ADD] / [FAVO_REMOVE]. */
+    const val PARAM_REMOVE = "remove"
+
+    /** `dev/favo&remove=0` — add the device to the account. */
+    const val FAVO_ADD = "0"
+
+    /** `dev/favo&remove=1` — take it off the account. Unused today; kept so the pair is legible. */
+    const val FAVO_REMOVE = "1"
 
     /**
      * `ptype` is the funding source. `91` = the dormitory wallet balance, which

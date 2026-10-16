@@ -88,6 +88,28 @@ interface HuiShengHuoApi {
         @Query(ApiConstants.PARAM_DID) did: String,
         @Query(ApiConstants.PARAM_RCP) rcp: Boolean = false,
     ): Response<ApiEnvelope<kotlinx.serialization.json.JsonElement>>
+
+    /**
+     * 扫码. Exchanges the id inside a machine's QR sticker for the device it belongs to.
+     *
+     * Needed only for codes that identify themselves; a code that already is a
+     * device id skips this call entirely. See
+     * [com.killhuishenghuo.data.model.DeviceQr].
+     */
+    @GET(ApiConstants.PATH_QR_USE)
+    suspend fun qrUse(
+        @Query(ApiConstants.PARAM_ID) id: String,
+    ): Response<ApiEnvelope<com.killhuishenghuo.data.model.QrUseData>>
+
+    /**
+     * 添加设备. `remove=0` puts the device into the account's `favos[]`, which is
+     * the only device list this client can read.
+     */
+    @GET(ApiConstants.PATH_DEVICE_FAVO)
+    suspend fun favouriteDevice(
+        @Query(ApiConstants.PARAM_DID) did: String,
+        @Query(ApiConstants.PARAM_REMOVE) remove: String = ApiConstants.FAVO_ADD,
+    ): Response<ApiEnvelope<kotlinx.serialization.json.JsonElement>>
 }
 
 /**

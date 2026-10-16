@@ -118,6 +118,10 @@ fun SettingsScreen(
     devices: List<Device> = emptyList(),
     selected: Device? = null,
     onDeviceSelected: (Device) -> Unit = {},
+    isBinding: Boolean = false,
+    bindMessage: String? = null,
+    bindFailed: Boolean = false,
+    onBindScanned: (String) -> Unit = {},
     onSignOut: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
@@ -201,9 +205,14 @@ fun SettingsScreen(
                 }
             }
 
-            // Only when there is something to choose between. With one device
-            // the question has one answer, and the screen already bound it.
-            if (devices.size > 1) {
+            // The section used to appear only when there was something to choose
+            // between — with one device the question has one answer, and the
+            // screen had already bound it. It now also has to appear when the
+            // answer is *none*, because that is exactly the state this block
+            // exists to get out of: a real account was found logged in, with
+            // `/master` answering and `favos` empty, and its only way forward was
+            // to scan the sticker on the machine.
+            if (state.isSignedIn) {
                 item(key = "devices") {
                     Section(title = "设备") {
                         devices.forEachIndexed { index, device ->
@@ -224,6 +233,13 @@ fun SettingsScreen(
                                 onClick = { onDeviceSelected(device) },
                             )
                         }
+                        if (devices.isNotEmpty()) Hairline()
+                        DeviceBindBlock(
+                            isBinding = isBinding,
+                            message = bindMessage,
+                            failed = bindFailed,
+                            onBind = onBindScanned,
+                        )
                     }
                 }
             }
@@ -838,7 +854,7 @@ private fun SignInBlock(
 
 /** The one filled button shape this screen uses, so the two modes cannot drift. */
 @Composable
-private fun PrimaryButton(
+internal fun PrimaryButton(
     text: String,
     enabled: Boolean,
     onClick: () -> Unit,
