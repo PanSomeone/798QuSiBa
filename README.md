@@ -1,5 +1,11 @@
 # 惠生活去死吧
 
+[![Star](https://img.shields.io/github/stars/PanSomeone/798QuSiBa?style=social&label=Star)](https://github.com/PanSomeone/798QuSiBa)
+[![Issue](https://img.shields.io/github/issues/PanSomeone/798QuSiBa)](https://github.com/PanSomeone/798QuSiBa/issues)
+
+**⭐ [给我的项目加个 Star 吧](https://github.com/PanSomeone/798QuSiBa)** —— 这个项目没有服务器、没有广告、
+没有数据分析，一个 star 是它唯一能被别人看到的途径。
+
 一个**只做一件事**的「惠生活798」第三方 Android 客户端：把宿舍的热水打开。
 
 > 自用学习工具，不发布、不商用、不对外分发。只调用官方 App 已经在用的同一个接口，
@@ -13,7 +19,9 @@
   `Authorization` 复制进来）。
 - **多设备选择**（账号下有多台时才出现）、**深色 / 浅色主题**（默认深色，选择持久化）。
 - **导出运行日志**：把这个进程从启动到现在做过的事写成一个 `.txt` 走系统分享面板，token 与
-  手机号在写入时就已脱敏。项目没有服务器，反馈走「复制到剪贴板」。
+  手机号在写入时就已脱敏。项目没有服务器，反馈走
+  [GitHub issue](https://github.com/PanSomeone/798QuSiBa/issues/new)——设置页把报告放进剪贴板，
+  再给你一个直达新建 issue 的按钮。
 
 ## 核心是怎么实现的
 
@@ -127,25 +135,29 @@ $adb = "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe"
 
 | 变体 | 产物 | `applicationId` | 大小 | 什么时候用 |
 |---|---|---|---|---|
-| `debug` | `app-debug.apk` | `com.killhuishenghuo` | 19,823,911 B | 平时开发：可调试、无混淆，栈里有真名字 |
-| `benchmark` | `app-benchmark.apk` | `…`.benchmark | 1,582,974 B | **想要快的就用这个**：和 release 同一份代码，debug key 签名，可与 debug 共存 |
-| `release` | `app-release-unsigned.apk` | `com.killhuishenghuo` | 1,574,770 B | 要自己签名发布时用；没配 keystore 时产物是未签名的 |
+| `debug` | `app-debug.apk` | `com.killhuishenghuo` | 19,745,711 B | 平时开发：可调试、无混淆，栈里有真名字 |
+| `benchmark` | `app-benchmark.apk` | `…`.benchmark | 1,582,978 B | **想要快的就用这个**：和 release 同一份代码，debug key 签名，可与 debug 共存 |
+| `release` | `app-release-unsigned.apk` | `com.killhuishenghuo` | 1,574,774 B | 要自己签名发布时用；没配 keystore 时产物是未签名的 |
 
 `benchmark` 是用 `initWith(getByName("release"))` 从 `release` 派生的，所以**两者不可能漂移
 成两个不同的程序**——任何加进 `release` 的东西自动也在 `benchmark` 里，而它是 debug key 签名的，
 谁都能构建、安装、卸载，不碰读者的真实应用。
 
-**R8 打开之后体积是 1/12.6**（19.8MB → 1.58MB）。项目**没有反射式依赖注入、JSON 解析全部走
+**R8 打开之后体积是 1/12.5**（19.7MB → 1.58MB）。项目**没有反射式依赖注入、JSON 解析全部走
 Kotlin 编译器插件生成的序列化器**，所以 `proguard-rules.pro` 不需要任何 keep 规则；
 minSdk 26 也不需要 desugaring 之外的特殊处理。
 
-发布页上那三个产物的 sha256：
+发布页上那三个产物（**目前仍是 v0.1.0 那一次构建**）的 sha256：
 
 ```
 惠生活去死吧-fast.apk             1,582,974 B  B7E5E40F7D469E005B791443C63E57CE2A5273D13DFA33243B9BE73A4BE49B3C
 惠生活去死吧-release-unsigned.apk 1,574,770 B  07DB01A05511310B70255CF2DA79DB856F3E5B8A68A71288442B36BD9CB8EE67
 惠生活去死吧-debug.apk           19,823,911 B  82473ED5CC78E7151CCB253B5FF9D623DB204586B5AD10E2525C2FE51776CCCD
 ```
+
+**版本号是要进 APK 的，所以改一次 `versionCode` / `versionName` 这三个哈希就全变。** 上面那三个数
+只在发布页上那份文件被换掉之前有效；本地新构建出来的哈希与它们不同是正常的，不是构建坏了。
+（v1.2 的审核脚本跑完会把当次三个 APK 的实际体积与 sha256 打出来。）
 
 **实测状态**（本机模拟器 `Medium_Phone_API_37.0`，Android 17）：
 
@@ -259,10 +271,17 @@ app/src/main/java/com/killhuishenghuo/
 `com.killhuishenghuo`，`minSdk 26`，`targetSdk 37`，JVM target 17，依赖走
 `gradle/libs.versions.toml`。
 
-源码之外只有三样：`tools/`（搬工程脚本、待机帧测量脚本、两个校对基线配置文件的脚本、
-[`PERFORMANCE.md`](tools/PERFORMANCE.md)）、
+源码之外只有三样：`tools/`（搬工程 [`move-project.cmd`](tools/move-project.cmd)、待机帧测量
+[`measure-idle.ps1`](tools/measure-idle.ps1)、两个校对基线配置文件的脚本、签名密钥库
+[`make-keystore.cmd`](tools/make-keystore.cmd)、v1.2 的改动与构建的校验脚本
+[`verify-v1.2.ps1`](tools/verify-v1.2.ps1)、[`PERFORMANCE.md`](tools/PERFORMANCE.md)）、
 `DESIGN.md`（开发笔记：色板、尺度、组件契约，**不是对外文档**）、`_attic/`（反编译工具、参考实现、
 真机截图，被 `.gitignore` 排除，编译不读它）。
+
+`tools/` 里的 PowerShell 脚本**一律只写 ASCII**：这台机器是 PowerShell 5.1 + ANSI 代码页 936，
+BOM-less 的 `.ps1` 会按 GB2312 解码，于是脚本里的中文在运行之前就已经烂掉——`verify-v1.2.ps1`
+的第一版就是这么死的（中文正则解析崩溃，脚本中止，最关键的构建那一步根本没跑到）。它要匹配的
+中文串现在写成 `\uXXXX` 转义、运行时解码，源文件一律用 `Get-Content -Encoding UTF8` 读。
 
 ## 已知限制
 - **「按了按钮、热水真的出来」没有被端到端验证过。** 验证到的是线格式与抓包样例逐字一致、登录
@@ -279,8 +298,19 @@ app/src/main/java/com/killhuishenghuo/
 - **按钮的空档只在应用这一侧**（三秒内不重复开始，但从不拦结束）：它防的是同一根手指连点，不是
   两台手机同时操作同一台设备。
 
-需要补充的信息（`cid` 的真值、`dtype=9` 的 `args` 形状、真实 `ui/app/master` 响应体样例等）见
-[`待补充清单.md`](待补充清单.md)。
+需要补充的信息（`cid` 的真值、`dtype=9` 的 `args` 形状、真实 `ui/app/master` 响应体样例等）都只能靠
+抓一条官方 App 的请求拿到，这个仓库里没有那份抓包——所以上面每一条都**保持「未验证」的状态**。
+
+## 反馈
+
+没有服务器，也没有邮箱，所有反馈都走
+[**GitHub Issues**](https://github.com/PanSomeone/798QuSiBa/issues/new)。
+
+设置页 →「反馈」里写好遇到了什么 → 按「复制报告」，它会生成一段脱敏过的诊断文本（账号、接口
+地址、最近一次报错、运行日志行数），再按「去 GitHub 提 issue」直接打开新建 issue 的页面，粘进去
+就行。**报告里不含 token**，那是它特意这么组装的。
+
+如果只是想让它继续存在，[点个 Star](https://github.com/PanSomeone/798QuSiBa) 就够了。
 
 ## 许可与用途
 

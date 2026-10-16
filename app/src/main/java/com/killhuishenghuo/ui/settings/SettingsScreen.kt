@@ -3,6 +3,8 @@ package com.killhuishenghuo.ui.settings
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -25,6 +27,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DarkMode
@@ -74,6 +77,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.killhuishenghuo.BuildConfig
+import com.killhuishenghuo.core.ProjectLinks
 import com.killhuishenghuo.core.log.AppLog
 import com.killhuishenghuo.core.log.LogExporter
 import com.killhuishenghuo.LastRefusal
@@ -260,15 +264,29 @@ fun SettingsScreen(
 
             item(key = "about") {
                 Section(title = "关于") {
-                    SettingRow(
+                    ProjectRow(
                         icon = Icons.Filled.Star,
-                        label = "PanSomeone",
-                        detail = "作者",
+                        label = "Star 这个项目",
+                        detail = "github.com/PanSomeone/798QuSiBa",
+                        url = ProjectLinks.REPOSITORY,
+                    )
+                    Hairline()
+                    ProjectRow(
+                        icon = Icons.Filled.BugReport,
+                        label = "反馈问题 / 提 issue",
+                        detail = "遇到问题先看这里",
+                        url = ProjectLinks.NEW_ISSUE,
+                    )
+                    Hairline()
+                    SettingRow(
+                        icon = Icons.Filled.Person,
+                        label = "作者",
+                        detail = "PanSomeone",
                         trailing = null,
                     )
                     Hairline()
                     SettingRow(
-                        icon = Icons.Filled.BugReport,
+                        icon = Icons.Filled.Description,
                         label = "版本",
                         detail = "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
                         trailing = null,
@@ -553,6 +571,13 @@ private fun FeedbackBlock(
     onCopy: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // Read here rather than taken as a parameter: the copy button is hoisted
+    // (`onCopy`) because it is the screen's business, but "open a browser" is
+    // not — it is the same thing `ProjectRow` below does, and it needs the same
+    // Context to do it. Without this line `context` resolves to the stdlib
+    // `kotlin.context`, and the link button does not compile.
+    val context = LocalContext.current
+
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -578,7 +603,7 @@ private fun FeedbackBlock(
 
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                text = if (copied) "报告已复制" else "",
+                text = if (copied) ProjectLinks.FEEDBACK_HINT else "",
                 style = SettingsType.detail,
                 color = colors.cooling,
                 modifier = Modifier.weight(1f),
@@ -587,7 +612,65 @@ private fun FeedbackBlock(
                 Text("复制报告", color = colors.water)
             }
         }
+
+        // The clipboard is where the report goes, not where it ends. Without
+        // this the button copies text into a place the user then has to guess a
+        // destination for, which is how a feedback button ends up unused.
+        TextButton(onClick = { openUrl(context, ProjectLinks.NEW_ISSUE) }) {
+            Text("去 GitHub 提 issue", color = colors.water)
+        }
     }
+}
+
+/**
+ * A row that leaves the app.
+ *
+ * Outlined in the settings list because every other row here changes something
+ * in this app, and this one does not: it opens a browser. Tapping it with no
+ * browser installed is possible on a stripped-down device, so the failure is
+ * logged rather than thrown — a settings screen that crashes on a device
+ * without Chrome would be a worse bug than the one being reported.
+ */
+@Composable
+private fun ProjectRow(
+    icon: ImageVector,
+    label: String,
+    detail: String,
+    url: String,
+    modifier: Modifier = Modifier,
+) {
+    val context = LocalContext.current
+
+    SettingRow(
+        icon = icon,
+        label = label,
+        detail = detail,
+        trailing = {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.OpenInNew,
+                contentDescription = null,
+                tint = colors.inkFaint,
+                modifier = Modifier.size(16.dp),
+            )
+        },
+        modifier = modifier,
+        onClick = { openUrl(context, url) },
+    )
+}
+
+/**
+ * Hands a URL to whatever can open it.
+ *
+ * `runCatching` rather than a `resolveActivity` pre-check: the check and the
+ * start are two separate questions on Android, and a device can answer the
+ * first one yes and then throw on the second. Catching the throw answers both.
+ */
+private fun openUrl(context: Context, url: String) {
+    runCatching {
+        context.startActivity(
+            Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+    }.onFailure { AppLog.error("Link", it, "打不开 $url") }
 }
 
 /**
