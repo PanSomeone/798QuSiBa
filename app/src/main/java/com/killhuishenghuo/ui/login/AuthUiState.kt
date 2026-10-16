@@ -19,6 +19,27 @@ enum class LoginMode {
 }
 
 /**
+ * What the row under the SMS form may offer once a code has been sent.
+ *
+ * Three states rather than the two the row used to branch on. `canResendSms` is
+ * false both *while* the clock runs and *after* it has run out with the fresh
+ * captcha not yet read, and the old row drew both as a countdown — so the end of
+ * the wait rendered "0 秒后可重新发送" with no button underneath it, and stayed
+ * there. "The wait is over" and "a code may be sent" are two different facts;
+ * a row that can only say one of them has to lie about the other.
+ */
+enum class ResendState {
+    /** A code may be sent again right now. */
+    READY,
+
+    /** Inside the cooldown; [AuthUiState.resendSeconds] is what is left of it. */
+    COUNTING_DOWN,
+
+    /** The wait is over, but the form is not filled in enough to send. */
+    NEEDS_INPUT,
+}
+
+/**
  * State of the sign-in screen.
  *
  * [captchaText] lives here rather than in the composable because it is half of
@@ -77,6 +98,19 @@ data class AuthUiState(
      * first code from tapping until the gateway rate-limits the whole account.
      */
     val canResendSms: Boolean get() = canSendSms && resendSeconds == 0
+
+    /**
+     * What the resend row is allowed to say.
+     *
+     * Derived rather than stored: it is a reading of two fields already in this
+     * state, and a stored copy is one `copy()` away from disagreeing with them.
+     */
+    val resendState: ResendState
+        get() = when {
+            canResendSms -> ResendState.READY
+            resendSeconds > 0 -> ResendState.COUNTING_DOWN
+            else -> ResendState.NEEDS_INPUT
+        }
 
     /** Signing in needs a code to have been sent and typed. */
     val canSubmitSms: Boolean get() = !isBusy && isSmsSent && smsCodeInput.trim().isNotEmpty()

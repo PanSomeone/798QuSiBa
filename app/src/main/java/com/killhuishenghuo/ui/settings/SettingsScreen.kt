@@ -826,8 +826,8 @@ private fun SignInBlock(
 
             if (state.isSmsSent) {
                 ResendRow(
+                    state = state.resendState,
                     seconds = state.resendSeconds,
-                    canResend = state.canResendSms,
                     onResend = viewModel::resendSmsCode,
                 )
             }        }

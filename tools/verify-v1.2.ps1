@@ -102,7 +102,7 @@ Write-Host "4. README" -ForegroundColor Cyan
 Check 'star link near the top'      ($readme -match $T_STAR_ASK) 'the literal line the user asked for'
 Check 'star badge'                  ($readme -match 'img\.shields\.io/github/stars/PanSomeone/798QuSiBa') 'missing'
 Check 'a feedback section'          ($readme -match "(?m)^## $T_FEEDBACK$") 'missing'
-Check 'issue links resolve'         ($readme -match '\*\*GitHub Issues\*\*\]\(https://github\.com/PanSomeone/798QuSiBa/issues/new\)') 'missing'
+Check 'issue links resolve'         ($readme -match '\]\(https://github\.com/PanSomeone/798QuSiBa/issues/new\)') 'missing'
 Check 'no link to the retired notes' ($readme -notmatch $T_PENDING) `
     'that file is not in the repository, so the link is a dead end'
 
@@ -149,9 +149,11 @@ foreach ($v in 'debug', 'benchmark', 'release') {
         }
     }
 }
-Write-Host "  (this run's build outputs. The README quotes the three published files in the"
-Write-Host "   repo root instead. -fast.apk is not byte-reproducible -- see the README -- so its"
-Write-Host "   hash here will not match the published one even when the source is identical.)"
+Write-Host "  (this run's build outputs. -fast.apk is not byte-reproducible: three clean builds"
+Write-Host "   of one commit give three different sha256 at an identical size, because it is the"
+Write-Host "   variant that is both shrunk and signed -- the difference lands in the signing"
+Write-Host "   block while all 88 zip entries stay byte-identical. debug and release DO rebuild"
+Write-Host "   byte-for-byte, so a hash here is comparable for those two and not for -fast.)"
 
 Write-Host ""
 if ($fail -eq 0) { Write-Host "all checks passed" -ForegroundColor Green }

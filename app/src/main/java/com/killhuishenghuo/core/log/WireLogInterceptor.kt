@@ -68,13 +68,48 @@ class WireLogInterceptor(
         // buffered that was not going to be.
         return runCatching {
             val bytes = body.bytes()
-            if (bytes.isNotEmpty()) AppLog.body("HTTP", bytes.decodeToString())
+            val type = body.contentType()
+            when {
+                bytes.isEmpty() -> Unit
+
+                isTextual(type) -> AppLog.body("HTTP", bytes.decodeToString())
+
+                // A picture is not a log line. `captcha/` answers with a PNG, and
+                // decoding 1 KB of it into a string writes box-drawing noise and
+                // **NUL bytes** into the buffer — which is what the exported
+                // `.txt` actually contained: 43 NULs, and a file that ordinary
+                // text tools (and the person trying to read the report) refuse to
+                // open. The size and type keep the "we did get an image" fact,
+                // which is the only part of it worth keeping.
+                else -> AppLog.log("HTTP", "body: ${bytes.size} bytes of $type, not logged")
+            }
             response.newBuilder()
                 .body(bytes.toResponseBody(body.contentType()))
                 .build()
         }.getOrElse { failure ->
             AppLog.error("HTTP", failure, "读取响应体失败，原样返回")
             response
+        }
+    }
+
+    /**
+     * Whether a body can be written into the log as text.
+     *
+     * A missing content type counts as text: the gateway omits it on some
+     * answers, and dropping those would lose the JSON this log exists for. The
+     * decision is deliberately about the *declared* type rather than a sniff of
+     * the bytes — a body that says `application/json` and turns out to be
+     * mangled is a bug worth seeing, not one worth hiding.
+     */
+    private fun isTextual(type: okhttp3.MediaType?): Boolean {
+        if (type == null) return true
+        if (type.type == "text") return true
+
+        // `application/problem+json` and friends: the suffix after `+` is the
+        // real format.
+        return when (type.subtype.substringAfterLast('+')) {
+            "json", "xml", "html", "javascript", "x-www-form-urlencoded" -> true
+            else -> false
         }
     }
 

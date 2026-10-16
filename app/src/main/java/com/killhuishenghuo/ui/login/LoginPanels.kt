@@ -154,11 +154,19 @@ private val CaptchaImageHeight = 40.dp
  * the same in both: once a code has been sent, the big button stops being a way
  * to get another one. A screen without this row has no way back to the send
  * button short of signing out.
+ *
+ * **[ResendState.NEEDS_INPUT] is the state this row used to get wrong.** At the
+ * end of the cooldown the ViewModel fetches a fresh captcha and clears the digits
+ * that belonged to the spent one, so a resend is not yet possible — and the row
+ * only knew "counting down" and "ready", so it fell into the countdown branch and
+ * rendered `0 秒后可重新发送` under no button, permanently. Reported from a phone
+ * as "重发验证码没有成功刷新". The wait being over is now its own sentence, and
+ * that sentence says what is actually missing.
  */
 @Composable
 fun ResendRow(
+    state: ResendState,
     seconds: Int,
-    canResend: Boolean,
     onResend: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -167,19 +175,31 @@ fun ResendRow(
         horizontalArrangement = Arrangement.End,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (canResend) {
-            TextButton(onClick = onResend) {
+        when (state) {
+            ResendState.READY -> TextButton(onClick = onResend) {
                 Text("重新发送", color = colors.water)
             }
-        } else {
-            Text(
-                text = "${seconds} 秒后可重新发送",
-                style = SettingsType.detail,
-                color = colors.inkFaint,
-                modifier = Modifier.padding(vertical = Spacing.sm, horizontal = Spacing.sm),
-            )
+
+            ResendState.COUNTING_DOWN -> ResendHint("$seconds 秒后可重新发送")
+
+            // One sentence for every reason the send is not ready — a cleared
+            // captcha, a captcha that failed to load, a phone number edited back
+            // down — because the fix is the same for all of them and naming only
+            // one would be wrong the rest of the time.
+            ResendState.NEEDS_INPUT -> ResendHint("填好手机号与验证码后可重新发送")
         }
     }
+}
+
+/** The row's quiet half: a sentence instead of a button. */
+@Composable
+private fun ResendHint(text: String) {
+    Text(
+        text = text,
+        style = SettingsType.detail,
+        color = colors.inkFaint,
+        modifier = Modifier.padding(vertical = Spacing.sm, horizontal = Spacing.sm),
+    )
 }
 
 /**

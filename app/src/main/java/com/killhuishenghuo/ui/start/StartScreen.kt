@@ -183,8 +183,8 @@ private fun SmsForm(
         // is out, the button above is "登录" for good.
         if (state.isSmsSent) {
             ResendRow(
+                state = state.resendState,
                 seconds = state.resendSeconds,
-                canResend = state.canResendSms,
                 onResend = viewModel::resendSmsCode,
             )
         }

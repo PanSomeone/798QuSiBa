@@ -368,9 +368,14 @@ class AuthViewModelTest {
         assertEquals("", ready.captchaText)
         // Not yet: a resend still needs the code for that new picture.
         assertFalse(ready.canResendSms)
+        // And the row has to say *that*. This is the bug that came back from a
+        // phone: the wait was over, but the row drew the same countdown it draws
+        // while waiting, so it read "0 秒后可重新发送" and no button ever appeared.
+        assertEquals(ResendState.NEEDS_INPUT, ready.resendState)
 
         viewModel.onCaptchaTextChange("CD34")
         assertTrue(viewModel.uiState.value.canResendSms)
+        assertEquals(ResendState.READY, viewModel.uiState.value.resendState)
         viewModel.resendSmsCode()
         advanceUntilIdle()
 
