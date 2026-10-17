@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>惠生活 · 宿舍热水</title>
+
+<!-- 这一组是 iOS「添加到主屏幕」真正认的标签。manifest 在 iOS 16.4+ 才被读，
+     所以主屏图标、状态栏样式、独立窗口这三件事必须在这里再声明一遍。 -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="惠生活">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png">
+<meta name="theme-color" content="#070B12">
+
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- 光晕:两团,和桌面端样式图同一套。纯装饰,aria-hidden。 -->
+<div class="glow glow-a" aria-hidden="true"></div>
+<div class="glow glow-b" aria-hidden="true"></div>
+
+<main id="app">
+
+  <!-- ===================== 使用 ===================== -->
+  <section id="screen-main" class="screen">
+    <header class="hero">
+      <h1>惠生活 去死吧</h1>
+      <p class="pun">798 748</p>
+    </header>
+
+    <div class="action">
+      <div class="chip" id="device-chip">
+        <span class="dot"></span><span id="device-name">还没登录</span>
+      </div>
+
+      <div class="mega-wrap">
+        <!-- 出水时的蒸汽。和安卓端同一件事:从按钮顶边往上飘,越往上越淡。
+             它是氛围,所以 pointer-events 关掉,绝不抢按钮的点击。 -->
+        <div class="steam" id="steam" aria-hidden="true">
+          <i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+        </div>
+        <button class="mega" id="btn-toggle">
+          <span id="toggle-label">去设置</span>
+        </button>
+      </div>
+
+      <p class="state" id="state-line">还没登录</p>
+      <!-- 只在出错时出现。正常路径上一个字都不写:点一下打开热水并不需要教。 -->
+      <p class="hint" id="main-hint"></p>
+    </div>
+  </section>
+
+  <!-- ===================== 设置 ===================== -->
+  <section id="screen-settings" class="screen hidden">
+    <header class="top">
+      <h1>设置</h1>
+    </header>
+
+    <!-- 没登录时的登录卡。默认短信登录。 -->
+    <div class="card" id="card-signin">
+      <div class="tabs">
+        <button class="tab on" data-mode="sms" type="button">短信登录</button>
+        <button class="tab" data-mode="token" type="button">粘贴 token</button>
+      </div>
+
+      <form id="form-sms" class="pane">
+        <label class="field">
+          <span>手机号</span>
+          <input id="input-phone" type="tel" inputmode="numeric" maxlength="11" placeholder="11 位手机号">
+        </label>
+        <div class="captcha-row">
+          <img id="captcha-img" alt="图形验证码" class="captcha">
+          <button class="ghost" id="btn-captcha" type="button">换一张</button>
+        </div>
+        <label class="field">
+          <span>图形验证码</span>
+          <input id="input-captcha" type="text" inputmode="numeric" maxlength="6" placeholder="图上的数字">
+        </label>
+        <button class="btn" id="btn-sms-send" type="button">获取验证码</button>
+        <label class="field hidden" id="field-smscode">
+          <span>短信验证码</span>
+          <input id="input-smscode" type="text" inputmode="numeric" maxlength="6" placeholder="6 位数字">
+        </label>
+        <button class="btn hidden" id="btn-sms-login" type="button">登录</button>
+      </form>
+
+      <form id="form-token" class="pane hidden">
+        <label class="field">
+          <span>token</span>
+          <input id="input-token" type="password" autocomplete="off" spellcheck="false"
+                 placeholder="官方 App 的 Authorization">
+        </label>
+        <button class="btn" id="btn-token" type="submit">登录</button>
+      </form>
+
+      <p class="status" id="login-status"></p>
+    </div>
+
+    <!-- 登录后的设备卡。一台就够:不会有人有多个热水器。 -->
+    <div class="card hidden" id="card-device">
+      <h2>设备</h2>
+      <div class="device">
+        <div class="device-name" id="device-name-2">还没有设备</div>
+        <div class="meta" id="device-id"></div>
+      </div>
+      <button class="ghost wide" id="btn-scan">扫码添加设备</button>
+      <button class="ghost wide" id="btn-refresh">刷新</button>
+      <p class="status" id="settings-status"></p>
+    </div>
+
+    <div class="card hidden" id="card-account">
+      <button class="ghost wide danger" id="btn-logout">退出登录</button>
+    </div>
+
+    <div class="card">
+      <h2>关于</h2>
+      <p class="links">
+        <a href="https://github.com/PanSomeone/798QuSiBa" target="_blank" rel="noopener">源码</a>
+        <span>·</span>
+        <a href="https://github.com/PanSomeone/798QuSiBa/issues/new" target="_blank" rel="noopener">反馈</a>
+        <span>·</span>
+        <span id="app-version">—</span>
+      </p>
+    </div>
+  </section>
+
+</main>
+
+<!-- 底部胶囊条,和安卓版同一条。高亮块是单独一层,靠它滑过去。 -->
+<nav class="tabbar" id="tabbar">
+  <div class="tab-indicator" id="tab-indicator" aria-hidden="true"></div>
+  <button class="tabitem on" data-tab="main">
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3l9 8h-3v9h-5v-6h-2v6H6v-9H3z"/></svg>
+    使用
+  </button>
+  <button class="tabitem" data-tab="settings">
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="12" r="3.4"/><path d="M12 2l1.6 2.4 2.8-.7.6 2.9 2.9.6-.7 2.8L21.6 12l-2.4 1.6.7 2.8-2.9.6-.6 2.9-2.8-.7L12 21.6l-1.6-2.4-2.8.7-.6-2.9-2.9-.6.7-2.8L2.4 12l2.4-1.6-.7-2.8 2.9-.6.6-2.9 2.8.7z" opacity=".5"/></svg>
+    设置
+  </button>
+</nav>
+
+<!-- 相机取景。整块盖住页面:扫码的时候没有别的事可做。 -->
+<div id="scan-overlay" class="scan hidden">
+  <video id="scan-video" playsinline muted autoplay></video>
+  <div class="scan-frame" aria-hidden="true"></div>
+  <p class="scan-hint">对准机器上的二维码</p>
+  <button class="ghost" id="btn-scan-cancel" type="button">取消</button>
+  <p class="status" id="scan-status"></p>
+</div>
+
+<script src="deviceqr.js"></script>
+<script src="vendor/jsQR.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

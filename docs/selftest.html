@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>惠生活 · 连通性自检</title>
+<style>
+  body { margin:0; padding:22px; background:#070b12; color:#e9eef6;
+         font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; line-height:1.7; }
+  h1 { font-size:20px; margin:0 0 6px; }
+  p.lead { color:#96a2b5; font-size:13px; margin:0 0 20px; }
+  .test { border:1px solid rgba(255,255,255,.1); border-radius:16px; padding:14px 16px;
+          margin-bottom:12px; background:rgba(255,255,255,.04); }
+  .test h2 { font-size:14px; margin:0 0 6px; font-weight:600; }
+  .test .out { font-size:13px; color:#96a2b5; word-break:break-all; }
+  .ok   { color:#4ade80; }
+  .bad  { color:#ff5a5f; }
+  .wait { color:#ffb020; }
+  img { max-width:100%; height:46px; border-radius:8px; margin-top:8px; background:#0a0f18; }
+  a { color:#4cc2f1; }
+</style>
+</head>
+<body>
+<h1>连通性自检</h1>
+<p class="lead">
+  这个页面只做一件事:证明你的浏览器能直接和官方网关通信。它不带任何 token,
+  也不读你存的任何东西 —— 打开就能跑。<a href="./">回到应用</a>
+</p>
+
+<div class="test" id="t-cors">
+  <h2>1 · 跨域能不能过</h2>
+  <div class="out wait">正在请求 ui/app/master…</div>
+</div>
+
+<div class="test" id="t-json">
+  <h2>2 · 网关的应答长什么样</h2>
+  <div class="out wait">等待上一步…</div>
+</div>
+
+<div class="test" id="t-img">
+  <h2>3 · 图形验证码能不能显示</h2>
+  <div class="out wait">正在加载…</div>
+</div>
+
+<script>
+const BASE = 'https://i.ilife798.com/api/v1/';
+const set = (id, cls, html) => {
+  const el = document.querySelector('#' + id + ' .out');
+  el.className = 'out ' + cls;
+  el.innerHTML = html;
+};
+const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+
+(async () => {
+  try {
+    const res = await fetch(BASE + 'ui/app/master', {
+      headers: { 'Accept': 'application/json', 'ApplicationType': '1,1', 'VersionCode': '31009' },
+      mode: 'cors',
+      credentials: 'omit',
+    });
+    const text = await res.text();
+    set('t-cors', 'ok', `通过了 — HTTP ${res.status}，读到了 ${text.length} 个字节`);
+
+    let body = null;
+    try { body = JSON.parse(text); } catch {}
+    if (body) {
+      const hasAccount = Boolean(body.data && body.data.account);
+      set('t-json', hasAccount ? 'ok' : 'wait',
+        `code=${esc(body.code)}，${hasAccount ? '带账号' : '没有账号（这是没带 token 的正常结果）'}<br>` +
+        `<code style="font-size:12px;color:#7a8798">${esc(text.slice(0, 220))}</code>`);
+    } else {
+      set('t-json', 'bad', '返回的不是 JSON：' + esc(text.slice(0, 160)));
+    }
+  } catch (e) {
+    set('t-cors', 'bad', '失败了：' + esc(e.message) +
+      '<br>如果这里是失败而安卓版能用,通常意味着网关改了跨域策略。');
+    set('t-json', 'bad', '没有应答可以看');
+  }
+
+  const key = Array.from(crypto.getRandomValues(new Uint8Array(10)))
+    .map((b) => 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'[b % 62]).join('');
+  const img = new Image();
+  img.onload = () => {
+    set('t-img', 'ok', `显示出来了 — ${img.naturalWidth}×${img.naturalHeight}`);
+    document.querySelector('#t-img').appendChild(img);
+  };
+  img.onerror = () => set('t-img', 'bad', '加载失败');
+  img.src = `${BASE}captcha/?s=${key}&r=${Date.now()}`;
+})();
+</script>
+</body>
+</html>
