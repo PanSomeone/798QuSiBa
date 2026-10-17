@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    1x1 / 2x1 / 1x2 用的那一副:整个组件就是一颗按钮。
+
+    没有标题、没有设备名、没有状态行 —— 因为在这个尺寸下,用户要的就是那一下。
+    状态由颜色和那一个字说出来:橙 + 开 = 关着,水蓝 + 关 = 正在出水。
+
+    背景在运行时换(`setBackgroundResource`),所以这里的 `widget_btn_off` 只是
+    预览图上的默认值:RemoteViews 没有"填色"的接口,只能整张图换。
+-->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_switch"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_btn_off"
+    android:gravity="center"
+    android:text="开热水"
+    android:textColor="#1A0A02"
+    android:textSize="20sp"
+    android:textStyle="bold"
+    android:maxLines="1"
+    android:includeFontPadding="false"
+    android:paddingHorizontal="6dp"
+    android:stateListAnimator="@null" />

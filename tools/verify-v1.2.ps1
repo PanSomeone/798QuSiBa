@@ -77,8 +77,21 @@ $qrParser = Slurp 'app\src\main\java\com\killhuishenghuo\data\model\DeviceQr.kt'
 
 Write-Host ""
 Write-Host "1. version" -ForegroundColor Cyan
-Check 'versionName is 1.2.4' ($gradle -match 'versionName\s*=\s*"1\.2\.4"') 'not found in app/build.gradle.kts'
-Check 'versionCode is 6'    ($gradle -match 'versionCode\s*=\s*6') `
+Check 'versionName is 1.3.0' ($gradle -match 'versionName\s*=\s*"1\.3\.0"') 'not found in app/build.gradle.kts'
+
+# The web client shows a version in Settings, and it is a hand-copied number. Two
+# hand-copied numbers drift; one of them is always right and nobody notices the
+# other one. So the rule is a check: the page and the app must agree.
+$webDir = "docs\app.js"
+if (Test-Path $webDir) {
+    $webJs = Get-Content $webDir -Raw -Encoding UTF8
+    $androidVersion = if ($gradle -match 'versionName\s*=\s*"([0-9]+\.[0-9]+\.[0-9]+)"') { $Matches[1] } else { "" }
+    $webVersion = if ($webJs -match "APP_VERSION\s*=\s*'([0-9]+\.[0-9]+\.[0-9]+)'") { $Matches[1] } else { "" }
+    Check 'web version matches the app' ($webVersion -ne '' -and $webVersion -eq $androidVersion) `
+        "docs/app.js says '$webVersion', app/build.gradle.kts says '$androidVersion'"
+}
+
+Check 'versionCode is 7'    ($gradle -match 'versionCode\s*=\s*7') `
     'Android refuses an install over an equal-or-lower code, and earlier builds are already on a phone'
 
 Write-Host ""
@@ -169,6 +182,32 @@ Write-Host "6b. R8 kept the ML Kit scanner" -ForegroundColor Cyan
 # Called as a child process so its `exit` cannot take this run with it.
 & powershell -NoProfile -ExecutionPolicy Bypass -File tools\verify-scan-keeps.ps1
 if ($LASTEXITCODE -ne 0) { $fail++ }
+
+Write-Host ""
+Write-Host "6b2. the web client, in a real browser" -ForegroundColor Cyan
+# Same reasoning as above: a sibling script, run in its own process. It starts a
+# static server, drives headless Edge, and asserts against the DOM -- the demo does
+# not touch localStorage, the steam follows the running state, the signed-out button
+# is the route to settings, and the version in the page matches the app's.
+if (Test-Path 'docs\index.html') {
+    & powershell -NoProfile -ExecutionPolicy Bypass -File tools\verify-web.ps1
+    if ($LASTEXITCODE -ne 0) { $fail++ }
+}
+
+Write-Host ""
+Write-Host "6c. the update check cannot leak the session token" -ForegroundColor Cyan
+$updateChecker = Slurp 'app\src\main\java\com\killhuishenghuo\data\update\UpdateChecker.kt'
+Check 'it talks to GitHub'          ($updateChecker -match 'api\.github\.com/repos/PanSomeone/798QuSiBa/releases') 'wrong or missing endpoint'
+Check 'it builds its own client'    ($updateChecker -match 'OkHttpClient\.Builder\(\)') `
+    'without its own client it would inherit the gateway one, and that one attaches Authorization to every request'
+# The check is on the **call**, not on the word. The first version also forbade the
+# string `AuthInterceptor` anywhere in the file, and the file's own KDoc explains
+# that hazard by name -- so the check failed on the comment that documents the rule
+# it was enforcing. Grepping source text cannot tell code from prose; grep the
+# thing that would actually leak, which is a call to the gateway's factory.
+Check 'it never borrows the gateway client' ($updateChecker -notmatch 'NetworkModule\.okHttpClient\(') `
+    'a session token for a water account must never be sent to api.github.com; UpdateCheckerTest pins it over a real socket too'
+Check 'the row is wired in'         ($settings -match 'UpdateRow\(') 'the block is not on the settings screen'
 
 Write-Host ""
 Write-Host "7. what the build actually produced" -ForegroundColor Cyan

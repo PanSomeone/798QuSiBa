@@ -29,6 +29,12 @@ import kotlinx.coroutines.delay
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -364,7 +370,23 @@ private fun PrimaryButton(
     // button's label and the headlines are the same face at different
     // volumes, and 40sp in a 66dp button left the ascenders touching both
     // edges.
-    val labelStyle = MaterialTheme.typography.displayMedium.copy(fontSize = 30.sp)
+    val labelStyle = MaterialTheme.typography.displayMedium.copy(fontSize = 33.sp)
+
+    // 风格 D 的「玻璃感」落在这一颗按钮上：一条自上而下的渐变 + 一道顶部高光，
+    // 让它是「一块有厚度的东西」而不是「一个填了色的矩形」。湿手在暗光里看到的
+    // 首先就是这个边缘。
+    //
+    // 做法是把自己画在按钮**背后**，并把 Material 的填充设成透明：这样水波纹、
+    // 按压态、无障碍节点全都还是 Material 那套，变的只是那一层颜色。
+    val base = when {
+        needsSetup -> palette.ctaFill
+        running -> palette.water
+        else -> palette.heated
+    }
+    val fill = remember(base) {
+        Brush.verticalGradient(listOf(lerp(base, Color.White, 0.18f), lerp(base, Color.Black, 0.06f)))
+    }
+    val highlight = remember(palette) { Color.White.copy(alpha = if (palette.isDark) 0.22f else 0.30f) }
 
     Button(
         onClick = onClick,
@@ -372,9 +394,24 @@ private fun PrimaryButton(
         modifier = modifier
             .fillMaxWidth()
             .height(PrimaryButtonHeight)
+            .clip(shape)
+            .drawBehind {
+                if (!enabled) return@drawBehind
+                drawRect(fill)
+                // 顶部那一道：只在最上面两像素，就是「玻璃的边」在这块面上的说法。
+                drawRect(
+                    color = highlight,
+                    size = Size(size.width, 2.dp.toPx()),
+                )
+            }
             .onGloballyPositioned { onBounds(it.boundsInRoot()) },
         shape = shape,
-        colors = buttonColors,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = Color.Transparent,
+            contentColor = buttonColors.contentColor,
+            disabledContainerColor = palette.surfaceSunken,
+            disabledContentColor = palette.inkMuted,
+        ),
     ) {
         if (busy) {
             CircularProgressIndicator(

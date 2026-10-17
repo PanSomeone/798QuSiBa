@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { background:#101216; }
+  body { width:4620px; height:2620px; padding:56px 60px; display:flex; gap:60px; align-items:flex-start;
+         font-family:"Microsoft YaHei UI","Microsoft YaHei","Noto Sans SC",sans-serif; }
+  .col { display:flex; flex-direction:column; gap:22px; align-items:center; }
+  .cap { color:#aeb7c6; font-size:30px; letter-spacing:.4px; text-align:center; height:76px; }
+  .cap b { color:#fff; font-size:34px; }
+  .cap span { color:#78828f; font-size:25px; display:block; margin-top:6px; }
+
+  .screen { width:1080px; height:2340px; overflow:hidden; position:relative;
+            border-radius:64px; border:1px solid #2b3038;
+            box-shadow:0 40px 90px rgba(0,0,0,.65); }
+  .inner { width:360px; height:780px; transform:scale(3); transform-origin:top left; position:relative;
+           display:flex; flex-direction:column; }
+
+  .statusbar { height:34px; display:flex; align-items:center; justify-content:space-between;
+               padding:0 20px; font-size:12px; }
+  .titlebar { padding:14px 22px 0; }
+  .appname { font-size:17px; font-weight:600; }
+  .sub { font-size:11.5px; margin-top:3px; }
+  .center { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
+            gap:18px; padding:0 22px; }
+  .state { font-size:19px; font-weight:600; }
+  .devrow { display:flex; align-items:center; gap:7px; font-size:12px; }
+  .dot { width:6px; height:6px; border-radius:50%; }
+  .btn { display:flex; align-items:center; justify-content:center; }
+  .btn span { font-size:21px; font-weight:700; letter-spacing:2px; }
+  .hint { font-size:11px; }
+  .tabbar { height:64px; display:flex; align-items:center; justify-content:center; }
+  .tab { display:flex; align-items:center; gap:6px; font-size:12.5px; }
+  .tab svg { width:15px; height:15px; }
+  .pad { height:14px; }
+
+  /* ================= A — GLASS (brand) ================= */
+  .a { background:#070B12; }
+  .a .glowx { position:absolute; width:560px; height:560px; left:-90px; top:120px; border-radius:50%;
+              background:radial-gradient(circle, rgba(76,194,241,.26) 0%, rgba(76,194,241,0) 62%); }
+  .a .glowy { position:absolute; width:460px; height:460px; right:-140px; top:390px; border-radius:50%;
+              background:radial-gradient(circle, rgba(255,107,53,.16) 0%, rgba(255,107,53,0) 66%); }
+  .a .statusbar { color:#8b97ab; }
+  .a .appname { color:#E9EEF6; }
+  .a .sub { color:#6f7d93; }
+  .a .state { color:#4CC2F1; }
+  .a .devrow { color:#96a2b5; }
+  .a .dot { background:#4ADE80; box-shadow:0 0 8px rgba(74,222,128,.7); }
+  .a .card { background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.10);
+             border-radius:22px; backdrop-filter:blur(18px); padding:13px 16px;
+             box-shadow:inset 0 1px 0 rgba(255,255,255,.09), 0 18px 40px rgba(0,0,0,.45); }
+  .a .btn { width:300px; height:104px; border-radius:28px;
+            background:linear-gradient(180deg,#FF8351 0%,#F2582A 100%);
+            box-shadow:0 20px 55px rgba(255,107,53,.40), inset 0 1px 0 rgba(255,255,255,.35);
+            border:1px solid rgba(255,180,140,.45); }
+  .a .btn span { color:#1B0E06; }
+  .a .hint { color:#6f7d93; }
+  .a .tabpill { display:flex; gap:4px; padding:7px; border-radius:34px;
+                background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.09);
+                backdrop-filter:blur(20px);
+                box-shadow:inset 0 1px 0 rgba(255,255,255,.09), 0 14px 30px rgba(0,0,0,.5); }
+  .a .tab { padding:9px 22px; border-radius:26px; color:#8b97ab; }
+  .a .tab.on { background:rgba(76,194,241,.18); color:#7FD3F5;
+               box-shadow:inset 0 0 0 1px rgba(76,194,241,.32); }
+
+  /* ================= B — MATERIAL 3 ==================== */
+  .b { background:#0E1116; }
+  .b .statusbar { color:#9AA3B2; }
+  .b .appname { color:#E6EAF2; font-size:20px; font-weight:500; }
+  .b .sub { color:#8A93A3; }
+  .b .state { color:#E6EAF2; font-size:30px; font-weight:500; letter-spacing:-.4px; }
+  .b .devrow { color:#AEB6C6; }
+  .b .dot { background:#7FD3F5; }
+  .b .card { background:#1B202A; border-radius:28px; padding:16px 18px; }
+  .b .btn { width:300px; height:86px; border-radius:28px; background:#7FD3F5;
+            box-shadow:0 10px 30px rgba(127,211,245,.20); }
+  .b .btn span { color:#052230; font-size:19px; letter-spacing:1.4px; }
+  .b .hint { color:#8A93A3; }
+  .b .navbar { position:absolute; left:0; right:0; bottom:0; height:80px; background:#151A23;
+               display:flex; align-items:center; justify-content:space-around; padding:0 44px; }
+  .b .navwrap { display:flex; flex-direction:column; align-items:center; gap:4px; }
+  .b .indic { width:58px; height:30px; border-radius:15px; display:flex; align-items:center;
+              justify-content:center; }
+  .b .navitem { font-size:11.5px; color:#8A93A3; }
+  .b .navitem.on { color:#7FD3F5; font-weight:600; }
+
+  /* ================= C — MONO ========================== */
+  .c { background:#08090B; }
+  .c .statusbar { color:#5F6368; }
+  .c .appname { color:#F1F3F4; font-size:15px; font-weight:500; letter-spacing:3px; }
+  .c .sub { color:#5F6368; letter-spacing:1.4px; font-size:10px; }
+  .c .state { color:#F1F3F4; font-size:40px; font-weight:250; letter-spacing:-1.2px; }
+  .c .devrow { color:#7B8085; letter-spacing:.8px; }
+  .c .dot { background:#4CC2F1; }
+  .c .btn { width:214px; height:214px; border-radius:50%;
+            background:radial-gradient(circle at 34% 26%, #6FD6FA 0%, #4CC2F1 42%, #10708F 100%);
+            box-shadow:0 0 0 1px rgba(120,215,255,.30), 0 26px 70px rgba(30,127,176,.45); }
+  .c .btn span { color:#04161E; font-size:17px; letter-spacing:2.6px; font-weight:700; }
+  .c .hint { color:#5F6368; letter-spacing:.6px; }
+  .c .tabs { display:flex; gap:46px; align-items:center; }
+  .c .tab { color:#5F6368; padding-bottom:9px; position:relative; letter-spacing:2.4px; font-size:12px; }
+  .c .tab.on { color:#F1F3F4; }
+  .c .tab.on:after { content:""; position:absolute; left:50%; bottom:0; transform:translateX(-50%);
+                     width:4px; height:4px; border-radius:50%; background:#4CC2F1; }
+
+  /* ================= D — GLASS + DYNAMIC =============== */
+  .d { background:#0B0E10; }
+  .d .glowx { position:absolute; width:560px; height:560px; left:-100px; top:140px; border-radius:50%;
+              background:radial-gradient(circle, rgba(242,200,121,.22) 0%, rgba(242,200,121,0) 62%); }
+  .d .glowy { position:absolute; width:440px; height:440px; right:-130px; top:380px; border-radius:50%;
+              background:radial-gradient(circle, rgba(140,190,255,.14) 0%, rgba(140,190,255,0) 66%); }
+  .d .statusbar { color:#8d949c; }
+  .d .appname { color:#EDEFF2; }
+  .d .sub { color:#757c85; }
+  .d .state { color:#F2C879; }
+  .d .devrow { color:#9aa1a9; }
+  .d .dot { background:#F2C879; box-shadow:0 0 8px rgba(242,200,121,.7); }
+  .d .card { background:rgba(255,255,255,.055); border:1px solid rgba(255,255,255,.11);
+             border-radius:24px; backdrop-filter:blur(18px); padding:13px 16px;
+             box-shadow:inset 0 1px 0 rgba(255,255,255,.10), 0 18px 40px rgba(0,0,0,.45); }
+  .d .btn { width:300px; height:104px; border-radius:30px;
+            background:linear-gradient(180deg,#F7D89A 0%,#E9BC6B 100%);
+            box-shadow:0 20px 55px rgba(242,200,121,.32), inset 0 1px 0 rgba(255,255,255,.5);
+            border:1px solid rgba(255,230,190,.5); }
+  .d .btn span { color:#241A06; }
+  .d .hint { color:#757c85; }
+  .d .tabpill { display:flex; gap:4px; padding:7px; border-radius:34px;
+                background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.10);
+                backdrop-filter:blur(20px);
+                box-shadow:inset 0 1px 0 rgba(255,255,255,.10), 0 14px 30px rgba(0,0,0,.5); }
+  .d .tab { padding:9px 22px; border-radius:26px; color:#8d949c; }
+  .d .tab.on { background:rgba(242,200,121,.16); color:#F7D89A;
+               box-shadow:inset 0 0 0 1px rgba(242,200,121,.30); }
+</style>
+</head>
+<body>
+
+<!-- ============ A ============ -->
+<div class="col">
+  <div class="cap"><b>A · 玻璃</b><span>现在的身份做深:光晕 + 磨砂卡 + 有触感的实体按钮</span></div>
+  <div class="screen a"><div class="inner">
+    <div class="glowx"></div><div class="glowy"></div>
+    <div class="statusbar"><span>23:40</span><span>5G ▮▮▮ 82%</span></div>
+    <div class="titlebar"><div class="appname">惠生活</div><div class="sub">798 · 宿舍热水</div></div>
+    <div class="center">
+      <div class="card"><div class="devrow"><span class="dot"></span>荟园13栋134 · 淋浴器</div></div>
+      <div class="btn"><span>一键启动热水</span></div>
+      <div class="state">热水已关</div>
+      <div class="hint">点一下开始 · 再点一下就关</div>
+    </div>
+    <div class="tabbar"><div class="tabpill">
+      <div class="tab on"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3l9 8h-3v9h-5v-6h-2v6H6v-9H3z"/></svg>使用</div>
+      <div class="tab"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="3.4"/><path d="M12 2l1.6 2.4 2.8-.7.6 2.9 2.9.6-.7 2.8L21.6 12l-2.4 1.6.7 2.8-2.9.6-.6 2.9-2.8-.7L12 21.6l-1.6-2.4-2.8.7-.6-2.9-2.9-.6.7-2.8L2.4 12l2.4-1.6-.7-2.8 2.9-.6.6-2.9 2.8.7z" opacity=".55"/></svg>设置</div>
+    </div></div>
+    <div class="pad"></div>
+  </div></div>
+</div>
+
+<!-- ============ B ============ -->
+<div class="col">
+  <div class="cap"><b>B · 原生</b><span>Material You:色阶分层、没有模糊、颜色跟随壁纸</span></div>
+  <div class="screen b"><div class="inner">
+    <div class="statusbar"><span>23:40</span><span>5G ▮▮▮ 82%</span></div>
+    <div class="titlebar"><div class="appname">惠生活</div><div class="sub">宿舍热水</div></div>
+    <div class="center">
+      <div class="card"><div class="devrow"><span class="dot"></span>荟园13栋134 · 淋浴器</div></div>
+      <div class="state">热水已关</div>
+      <div class="btn"><span>启动热水</span></div>
+      <div class="hint">再点一次即可关闭</div>
+    </div>
+    <div class="navbar">
+      <div class="navwrap">
+        <div class="indic" style="background:rgba(127,211,245,.20)">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="#7FD3F5"><path d="M12 3l9 8h-3v9h-5v-6h-2v6H6v-9H3z"/></svg>
+        </div><div class="navitem on">使用</div>
+      </div>
+      <div class="navwrap">
+        <div class="indic">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="#8A93A3"><circle cx="12" cy="12" r="3.4"/><path d="M12 2l1.6 2.4 2.8-.7.6 2.9 2.9.6-.7 2.8L21.6 12l-2.4 1.6.7 2.8-2.9.6-.6 2.9-2.8-.7L12 21.6l-1.6-2.4-2.8.7-.6-2.9-2.9-.6.7-2.8L2.4 12l2.4-1.6-.7-2.8 2.9-.6.6-2.9 2.8.7z" opacity=".55"/></svg>
+        </div><div class="navitem">设置</div>
+      </div>
+    </div>
+  </div></div>
+</div>
+
+<!-- ============ C ============ -->
+<div class="col">
+  <div class="cap"><b>C · 极简</b><span>只有能按的东西有颜色,其余全部是灰阶</span></div>
+  <div class="screen c"><div class="inner">
+    <div class="statusbar"><span>23:40</span><span>82%</span></div>
+    <div class="titlebar"><div class="appname">惠 生 活</div><div class="sub">798 · 荟园13栋134</div></div>
+    <div class="center" style="gap:28px">
+      <div class="state">热水已关</div>
+      <div class="btn"><span>启动</span></div>
+      <div class="devrow"><span class="dot"></span>淋浴器 · 点两下切换</div>
+    </div>
+    <div class="tabbar"><div class="tabs">
+      <div class="tab on">使用</div><div class="tab">设置</div>
+    </div></div>
+    <div class="pad"></div>
+  </div></div>
+</div>
+
+<!-- ============ D ============ -->
+<div class="col">
+  <div class="cap"><b>D · 玻璃 + 取色</b><span>A 的质感,B 的取色:主色取自壁纸(这里演示暖色)</span></div>
+  <div class="screen d"><div class="inner">
+    <div class="glowx"></div><div class="glowy"></div>
+    <div class="statusbar"><span>23:40</span><span>5G ▮▮▮ 82%</span></div>
+    <div class="titlebar"><div class="appname">惠生活</div><div class="sub">798 · 宿舍热水</div></div>
+    <div class="center">
+      <div class="card"><div class="devrow"><span class="dot"></span>荟园13栋134 · 淋浴器</div></div>
+      <div class="btn"><span>一键启动热水</span></div>
+      <div class="state">热水已关</div>
+      <div class="hint">点一下开始 · 再点一下就关</div>
+    </div>
+    <div class="tabbar"><div class="tabpill">
+      <div class="tab on"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3l9 8h-3v9h-5v-6h-2v6H6v-9H3z"/></svg>使用</div>
+      <div class="tab"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="3.4"/><path d="M12 2l1.6 2.4 2.8-.7.6 2.9 2.9.6-.7 2.8L21.6 12l-2.4 1.6.7 2.8-2.9.6-.6 2.9-2.8-.7L12 21.6l-1.6-2.4-2.8.7-.6-2.9-2.9-.6.7-2.8L2.4 12l2.4-1.6-.7-2.8 2.9-.6.6-2.9 2.8.7z" opacity=".55"/></svg>设置</div>
+    </div></div>
+    <div class="pad"></div>
+  </div></div>
+</div>
+
+</body>
+</html>

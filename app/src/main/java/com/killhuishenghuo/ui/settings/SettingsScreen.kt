@@ -122,6 +122,8 @@ fun SettingsScreen(
     bindMessage: String? = null,
     bindFailed: Boolean = false,
     onBindScanned: (String) -> Unit = {},
+    updateState: UpdateUiState = UpdateUiState.Idle,
+    onCheckUpdate: () -> Unit = {},
     onSignOut: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
@@ -301,6 +303,12 @@ fun SettingsScreen(
                         trailing = null,
                     )
                     Hairline()
+                    UpdateRow(
+                        state = updateState,
+                        onCheck = onCheckUpdate,
+                        onOpenUrl = { openUrl(context, it) },
+                    )
+                    Hairline()
                     SettingRow(
                         icon = Icons.Filled.Description,
                         label = "版本",
@@ -357,7 +365,7 @@ private fun Section(
  * as a rendering bug even though nobody can say why.
  */
 @Composable
-private fun SettingRow(
+internal fun SettingRow(
     icon: ImageVector,
     label: String,
     detail: String?,

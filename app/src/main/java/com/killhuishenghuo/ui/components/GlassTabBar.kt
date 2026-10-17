@@ -36,6 +36,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.killhuishenghuo.ui.theme.Motion
 import com.killhuishenghuo.ui.theme.Radii
 import com.killhuishenghuo.ui.theme.Spacing
@@ -123,8 +124,14 @@ fun GlassTabBar(
     }
 }
 
-/** Both the pill and the tab have to agree on this, or the fill misses the row. */
-private val TabHeight = 48.dp
+/**
+ * Both the pill and the tab have to agree on this, or the fill misses the row.
+ *
+ * 48dp was the Material floor, and it read as "a strip", not as something to press —
+ * 这条栏是给一只手、可能是湿着的手用的,而它要按的只有两个目标。56dp 让每一格
+ * 的触摸区域从「刚好达标」变成「不用瞄准」,代价只是栏高多了 8dp。
+ */
+private val TabHeight = 56.dp
 
 /**
  * The bar's own shape, hoisted.
@@ -211,7 +218,7 @@ private fun TabButton(
             imageVector = tab.icon,
             contentDescription = null,
             tint = tint,
-            modifier = Modifier.size(20.dp),
+            modifier = Modifier.size(22.dp),
         )
 
         Spacer(Modifier.width(Spacing.xs))
@@ -219,6 +226,9 @@ private fun TabButton(
         Text(
             text = tab.label,
             style = MaterialTheme.typography.titleSmall,
+            // 15sp instead of the scale's 14: the bar got taller so the label could
+            // grow with it, and a label that grows alone reads as a bigger bar.
+            fontSize = 15.sp,
             color = tint,
         )
     }

@@ -142,10 +142,12 @@ fun ThemeMode.resolveDark(): Boolean = when (this) {
 @Composable
 fun KillHuiShengHuoTheme(
     mode: ThemeMode = ThemeMode.DARK,
+    /** 风格 D 的「取色」：API 31+ 且系统给了动态色板时，中性色跟着壁纸走。 */
+    dynamicColor: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     val dark = mode.resolveDark()
-    val colors = if (dark) DarkKhsColors else LightKhsColors
+    val colors = rememberKhsColors(dark = dark, dynamic = dynamicColor)
 
     CompositionLocalProvider(localKhsColors provides colors) {
         MaterialTheme(

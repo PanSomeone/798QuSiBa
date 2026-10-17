@@ -53,6 +53,22 @@
             tools:replace="android:screenOrientation" />
 
         <!--
+            桌面小组件. `exported="false"` 是刻意的:它只被系统(发 APPWIDGET_UPDATE)
+            和自己(发 TOGGLE 广播)调用,不需要被第三方启动。
+        -->
+        <receiver
+            android:name=".widget.WaterWidgetProvider"
+            android:exported="false"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/water_widget_info" />
+        </receiver>
+
+        <!--
             Exists for one file: the log the user exports from settings and sends
             back. Authority is derived from the package name so a debug and a
             release build on the same phone cannot collide.

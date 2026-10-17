@@ -30,6 +30,7 @@ import com.killhuishenghuo.core.log.AppLog
 import com.killhuishenghuo.core.net.NetworkModule
 import com.killhuishenghuo.data.local.ThemeMode
 import com.killhuishenghuo.data.model.Device
+import com.killhuishenghuo.data.update.UpdateChecker
 import com.killhuishenghuo.ui.components.GlassScrim
 import com.killhuishenghuo.ui.components.GlassTabBar
 import com.killhuishenghuo.ui.components.MainTab
@@ -42,6 +43,7 @@ import com.killhuishenghuo.ui.hotwater.HotWaterViewModelFactory
 import com.killhuishenghuo.ui.login.AuthViewModel
 import com.killhuishenghuo.ui.login.AuthViewModelFactory
 import com.killhuishenghuo.ui.settings.SettingsScreen
+import com.killhuishenghuo.ui.settings.UpdateViewModel
 import com.killhuishenghuo.ui.start.StartScreen
 import com.killhuishenghuo.ui.theme.DarkKhsColors
 import com.killhuishenghuo.ui.theme.KillHuiShengHuoTheme
@@ -395,6 +397,14 @@ private fun SettingsHost(
     val viewModel: AuthViewModel = viewModel(key = "settings-account", factory = factory)
     val authState by viewModel.uiState.collectAsStateWithLifecycle()
 
+    // Its own ViewModel, keyed on nothing: the update check shares no state with
+    // the session or the device list, so re-running it whenever either of those
+    // changes would be a request spent to learn something that did not move.
+    val updateViewModel: UpdateViewModel = viewModel(key = "update") {
+        UpdateViewModel(checker = UpdateChecker())
+    }
+    val updateState by updateViewModel.state.collectAsStateWithLifecycle()
+
     // Collected here, at the leaf, rather than passed in as `devices`/`selected`.
     // The settings screen is the only thing that shows the device list, so the
     // subscription belongs here — see `HotWaterViewModel.sessionExpired` for the
@@ -414,6 +424,8 @@ private fun SettingsHost(
         bindMessage = hotWaterState.bindMessage,
         bindFailed = hotWaterState.bindFailed,
         onBindScanned = onBindScanned,
+        updateState = updateState,
+        onCheckUpdate = updateViewModel::check,
         onSignOut = {
             viewModel.signOut()
             onSignOut()

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    尺寸从"最小 1x1"开始报,而不是 4x2。
+
+    `minWidth`/`minHeight` 是**能缩到多小**,`targetCell*` 是"默认摆成多大"。所以这里
+    两个都是 1 格,目标 2x1:拉出来是一个按钮,想大就自己拖大,拖到 2x2 时
+    `onAppWidgetOptionsChanged` 会把它换成带设备名的那张卡。
+
+    1 格 ≈ 70dp,减去启动器留的边,报 40dp 是各家启动器都接受的下限。
+-->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="40dp"
+    android:minHeight="40dp"
+    android:minResizeWidth="40dp"
+    android:minResizeHeight="40dp"
+    android:targetCellWidth="2"
+    android:targetCellHeight="1"
+    android:initialLayout="@layout/widget_water_switch"
+    android:previewLayout="@layout/widget_water_switch"
+    android:resizeMode="horizontal|vertical"
+    android:widgetCategory="home_screen"
+    android:description="@string/widget_description"
+    android:updatePeriodMillis="0" />

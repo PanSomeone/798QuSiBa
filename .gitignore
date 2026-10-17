@@ -34,3 +34,8 @@ keystore/
 # `tools/` 里那两个 Python 脚本校对 profile 时留下的字节码缓存。它不是源码，而且
 # 每次都重新生成。
 __pycache__/
+
+# 设计稿与真机截图:它们是产物,不是源码。生成它们的输入(design\ui-styles.html)
+# 留在仓库里,所以要从头复现只要一条 headless Edge 的截图命令。
+shots/
+design/**/*.png
