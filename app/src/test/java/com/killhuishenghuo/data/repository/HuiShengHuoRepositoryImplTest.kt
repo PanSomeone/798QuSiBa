@@ -113,6 +113,38 @@ class HuiShengHuoRepositoryImplTest {
     }
 
     @Test
+    fun `an anonymous master with a token attached is a dead session`() = runBlocking {
+        // This is the bug the log caught on 2026-10-20: the token had died, so
+        // `ui/app/master` answered `{"code":0,"data":{"ads":[]}}` — success, and
+        // anonymous. The app believed it was signed in, showed no devices, and
+        // invited the user to scan one; `dev/favo` then answered -99. A `code:0`
+        // with no account, on an install that did send a token, is a rejection
+        // dressed as an empty account.
+        gateway.masterAnswer = { envelope(MasterData(account = null, favos = emptyList())) }
+
+        val outcome =
+            HuiShengHuoRepositoryImpl(
+                gateway = gateway,
+                ioDispatcher = Dispatchers.Unconfined,
+                isSignedIn = { true },
+            ).loadDevices()
+
+        assertEquals(AppError.Unauthorized, outcome.errorOrNull())
+    }
+
+    @Test
+    fun `an anonymous master without a token is just an empty account`() = runBlocking {
+        // The screen is deliberately reachable signed out — the button then reads
+        // 去设置 — and that path must keep working. Same body, different meaning,
+        // and the only thing that can tell them apart is whether a token went out.
+        gateway.masterAnswer = { envelope(MasterData(account = null, favos = emptyList())) }
+
+        val outcome = repository().loadDevices()
+
+        assertEquals(emptyList<Device>(), outcome.getOrNull())
+    }
+
+    @Test
     fun `loadDevices reports a missing payload rather than an empty list`() = runBlocking {
         // `code: 0` with no `data` is a shape the gateway really answers. Treating
         // it as "no devices" would silently show an empty account.

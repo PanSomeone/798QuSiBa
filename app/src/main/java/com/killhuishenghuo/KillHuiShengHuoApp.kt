@@ -52,7 +52,12 @@ class KillHuiShengHuoApp : Application() {
     val gateway: GatewayClient by lazy { RetrofitGatewayClient(graph.api) }
 
     val repository: HuiShengHuoRepository by lazy {
-        HuiShengHuoRepositoryImpl(gateway = gateway)
+        HuiShengHuoRepositoryImpl(
+            gateway = gateway,
+            // Read at call time, not captured: signing out and back in swaps the
+            // token under a repository that outlives both.
+            isSignedIn = { session.isLoggedIn },
+        )
     }
 
     val authRepository: AuthRepository by lazy {

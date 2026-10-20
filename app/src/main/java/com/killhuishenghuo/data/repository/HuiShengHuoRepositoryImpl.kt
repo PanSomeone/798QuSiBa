@@ -1,5 +1,6 @@
 package com.killhuishenghuo.data.repository
 
+import com.killhuishenghuo.core.log.AppLog
 import com.killhuishenghuo.core.net.GatewayClient
 import com.killhuishenghuo.data.model.AppError
 import com.killhuishenghuo.data.model.Device
@@ -26,6 +27,20 @@ import kotlinx.coroutines.withContext
 class HuiShengHuoRepositoryImpl(
     private val gateway: GatewayClient,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    /**
+     * Whether this install believes it holds a session, asked at call time.
+     *
+     * `ui/app/master` answers `{"code":0,"data":{"ads":[]}}` to a request with no
+     * `Authorization` and to a request with a token the server has forgotten —
+     * byte for byte the same body. The difference is only readable from this
+     * side: if a token was sent, an anonymous answer means the token is dead.
+     *
+     * A lambda rather than a `SessionStore`, because a boolean is the whole
+     * question and the repository has no business reading `uid` or the token.
+     * Defaults to `false`, which is the old behaviour: an install with no session
+     * is allowed to see an empty device list.
+     */
+    private val isSignedIn: () -> Boolean = { false },
 ) : HuiShengHuoRepository {
 
     override suspend fun loadDevices(): Outcome<List<Device>> = withContext(ioDispatcher) {
@@ -33,7 +48,25 @@ class HuiShengHuoRepositoryImpl(
             .getOrElse(ApiResultMapper::mapThrown)
             .let { outcome ->
                 when (outcome) {
-                    is Outcome.Success -> Outcome.Success(outcome.value.toDevices())
+                    is Outcome.Success -> {
+                        val data = outcome.value
+                        if (isSignedIn() && data.account?.id.isNullOrBlank()) {
+                            // A token went out and the account did not come back:
+                            // the session is dead, and the screen must say so
+                            // instead of offering to scan a device that adding
+                            // would then fail to attach to anything. Observed live
+                            // (2026-10-20, log 232145): master returned anonymous
+                            // while `dev/favo` answered -99 登录状态已过期.
+                            AppLog.log(
+                                "Devices",
+                                "master came back anonymous with a token attached: session is dead",
+                            )
+                            Outcome.Failure(AppError.Unauthorized)
+                        } else {
+                            Outcome.Success(data.toDevices())
+                        }
+                    }
+
                     is Outcome.Failure -> outcome
                 }
             }
