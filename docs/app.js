@@ -32,7 +32,9 @@ const BASE = 'https://i.ilife798.com/api/v1/';
  * 它和下面的 `APP_VERSION` 是两件事:那个是这个网页端自己的版本,这个是"我假装
  * 自己是官方 App 的第几版"。
  */
-const VERSION_CODE = '31009';
+// 服务器到底认哪个版本声明,只能靠试;每改一次都重新部署太慢,
+// 所以在网址后面加 ?vc=45000 就能立刻换一个再试一次。
+const VERSION_CODE = new URLSearchParams(location.search).get("vc") || "31009";
 
 /**
  * 显示用的版本号,跟安卓端 `app/build.gradle.kts` 的 `versionName` **同步**。
