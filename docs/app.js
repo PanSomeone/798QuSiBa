@@ -40,7 +40,7 @@ const VERSION_CODE = '31009';
  * 两边各自记一个数字迟早会漂,所以 `tools/verify-v1.2.ps1` 里有一条检查:这两个值
  * 必须相等。改一处忘另一处会让校验脚本红,而不是让用户在设置里看到一个旧版本。
  */
-const APP_VERSION = '1.3.2';
+const APP_VERSION = '1.3.3';
 
 /** 网关的业务码。0 是成功,-99 是所有需鉴权接口共用的会话失效。 */
 const CODE_OK = 0;

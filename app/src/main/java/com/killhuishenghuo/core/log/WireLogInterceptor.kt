@@ -34,7 +34,15 @@ class WireLogInterceptor(
 
         val request = chain.request()
         val started = System.nanoTime()
-        AppLog.log("HTTP", "→ ${request.method} ${request.url}")
+
+        // 一行把「这次到底用哪个作用域发的」写进日志。
+        //
+        // 需要它的原因很具体:同一个包在模拟器上能开阀、在手机上被「请升级最新版APP」
+        // 挡住,而肉眼没法分辨作用域究竟有没有真的发出去。这两个头都不是秘密(一件是
+        // 常量、一件是版本号),把值写出来,一次点击就能把猜测变成事实。
+        val scope = request.header("ApplicationType").orEmpty().ifBlank { "?" }
+        val versionCode = request.header("VersionCode").orEmpty().ifBlank { "?" }
+        AppLog.log("HTTP", "→ ${request.method} ${request.url} · at=$scope vc=$versionCode")
 
         request.body?.let { body ->
             readBody(body)?.takeIf { it.isNotBlank() }?.let { AppLog.body("HTTP", it) }

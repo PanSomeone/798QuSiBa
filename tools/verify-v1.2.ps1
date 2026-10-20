@@ -77,7 +77,7 @@ $qrParser = Slurp 'app\src\main\java\com\killhuishenghuo\data\model\DeviceQr.kt'
 
 Write-Host ""
 Write-Host "1. version" -ForegroundColor Cyan
-Check 'versionName is 1.3.2' ($gradle -match 'versionName\s*=\s*"1\.3\.2"') 'not found in app/build.gradle.kts'
+Check 'versionName is 1.3.3' ($gradle -match 'versionName\s*=\s*"1\.3\.3"') 'not found in app/build.gradle.kts'
 
 # The web client shows a version in Settings, and it is a hand-copied number. Two
 # hand-copied numbers drift; one of them is always right and nobody notices the
@@ -91,7 +91,7 @@ if (Test-Path $webDir) {
         "docs/app.js says '$webVersion', app/build.gradle.kts says '$androidVersion'"
 }
 
-Check 'versionCode is 9'    ($gradle -match 'versionCode\s*=\s*9') `
+Check 'versionCode is 10'    ($gradle -match 'versionCode\s*=\s*10') `
     'Android refuses an install over an equal-or-lower code, and earlier builds are already on a phone'
 
 Write-Host ""
