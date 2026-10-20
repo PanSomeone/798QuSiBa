@@ -9,10 +9,19 @@ import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -34,6 +43,7 @@ import com.killhuishenghuo.data.update.UpdateChecker
 import com.killhuishenghuo.ui.components.GlassScrim
 import com.killhuishenghuo.ui.components.GlassTabBar
 import com.killhuishenghuo.ui.components.MainTab
+import com.killhuishenghuo.ui.components.UpdateBanner
 import com.killhuishenghuo.ui.components.glassTabBarSpace
 import com.killhuishenghuo.ui.theme.Spacing
 import com.killhuishenghuo.ui.hotwater.HotWaterScreen
@@ -43,6 +53,7 @@ import com.killhuishenghuo.ui.hotwater.HotWaterViewModelFactory
 import com.killhuishenghuo.ui.login.AuthViewModel
 import com.killhuishenghuo.ui.login.AuthViewModelFactory
 import com.killhuishenghuo.ui.settings.SettingsScreen
+import com.killhuishenghuo.ui.settings.UpdateUiState
 import com.killhuishenghuo.ui.settings.UpdateViewModel
 import com.killhuishenghuo.ui.start.StartScreen
 import com.killhuishenghuo.ui.theme.DarkKhsColors
@@ -229,6 +240,19 @@ private fun AppRoot() {
             // screens, and the tab bar.
             val sessionExpired by hotWater.sessionExpired.collectAsStateWithLifecycle()
 
+            // 自动检查更新。
+            //
+            // ViewModel 从设置页提到这一层,有两个原因:主屏要能画横幅(否则用户得先
+            // 点进设置、再点那一行才知道有新版本,这不叫自动);以及两处必须看同一个
+            // 状态 —— 两个实例会出现"设置里说已是最新、主屏却在说有新版"。
+            //
+            // `LaunchedEffect(Unit)`:一次进程只问一次。它是个网络请求,不该随重组重复。
+            val updateViewModel: UpdateViewModel = viewModel(key = "update") {
+                UpdateViewModel(checker = UpdateChecker())
+            }
+            val updateState by updateViewModel.state.collectAsStateWithLifecycle()
+            LaunchedEffect(Unit) { updateViewModel.check() }
+
             // A stale session is the one thing that gets its own screen.
             if (sessionExpired) {
                 StartHost(
@@ -250,6 +274,8 @@ private fun AppRoot() {
                     app = app,
                     host = host,
                     dark = dark,
+                    updateState = updateState,
+                    onCheckUpdate = updateViewModel::check,
                     // The flow, not a snapshot of it. Collected inside
                     // `SettingsHost` so that a device refresh recomposes the
                     // settings rows and nothing above them — which is the whole
@@ -270,6 +296,26 @@ private fun AppRoot() {
                         destination = Destination.MAIN
                     },
                 )
+            }
+
+            // 自动检查的结果:只在新版可用、且在「使用」屏时出现。
+            //
+            // 不弹窗、不挡按钮 —— 它是一条压在底栏上方的细条。外层 Box 铺满全屏但
+            // 没有 pointerInput,所以点别处会穿过去:它是层"画",不是层"盖"。
+            val available = updateState as? UpdateUiState.Available
+            if (available != null && destination == Destination.MAIN) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = Spacing.lg),
+                    contentAlignment = Alignment.BottomCenter,
+                ) {
+                    UpdateBanner(
+                        latest = available.latest,
+                        url = available.url,
+                        modifier = Modifier.padding(bottom = glassTabBarSpace()),
+                    )
+                }
             }
 
             // The bar is drawn here, once, above whichever screen is up — and the
@@ -382,6 +428,8 @@ private fun SettingsHost(
     app: KillHuiShengHuoApp,
     host: String,
     dark: Boolean,
+    updateState: UpdateUiState,
+    onCheckUpdate: () -> Unit,
     state: StateFlow<HotWaterUiState>,
     onDeviceSelected: (Device) -> Unit,
     onBindScanned: (String) -> Unit,
@@ -396,14 +444,6 @@ private fun SettingsHost(
     }
     val viewModel: AuthViewModel = viewModel(key = "settings-account", factory = factory)
     val authState by viewModel.uiState.collectAsStateWithLifecycle()
-
-    // Its own ViewModel, keyed on nothing: the update check shares no state with
-    // the session or the device list, so re-running it whenever either of those
-    // changes would be a request spent to learn something that did not move.
-    val updateViewModel: UpdateViewModel = viewModel(key = "update") {
-        UpdateViewModel(checker = UpdateChecker())
-    }
-    val updateState by updateViewModel.state.collectAsStateWithLifecycle()
 
     // Collected here, at the leaf, rather than passed in as `devices`/`selected`.
     // The settings screen is the only thing that shows the device list, so the
@@ -425,7 +465,7 @@ private fun SettingsHost(
         bindFailed = hotWaterState.bindFailed,
         onBindScanned = onBindScanned,
         updateState = updateState,
-        onCheckUpdate = updateViewModel::check,
+        onCheckUpdate = onCheckUpdate,
         onSignOut = {
             viewModel.signOut()
             onSignOut()

@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -69,7 +71,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -78,6 +82,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.killhuishenghuo.BuildConfig
 import com.killhuishenghuo.core.ProjectLinks
+import com.killhuishenghuo.R
 import com.killhuishenghuo.core.log.AppLog
 import com.killhuishenghuo.core.log.LogExporter
 import com.killhuishenghuo.LastRefusal
@@ -316,8 +321,71 @@ fun SettingsScreen(
                         trailing = null,
                     )
                 }
+
+                // 赞助放在最底下:它是"用着顺手再说"的东西,不是入口。
+                // 两张收款码并排,比例按原图(支付宝高一些)。不弹窗、不拦路 ——
+                // 想给的人自己扫,不想给的人划过去就没了。
+                Section(title = "赞助") {
+                    // Section 只负责标题的缩进,内容要自己带内边距 —— 否则图片会顶到
+                    // 屏幕边缘,和上面每一行的左边界对不齐。
+                    Column(modifier = Modifier.padding(horizontal = Spacing.lg)) {
+                        Text(
+                            text = "觉得好用的请我喝一杯咖啡吧 🌟",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = colors.ink,
+                            modifier = Modifier.padding(bottom = Spacing.sm),
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                            SponsorCode(
+                                image = R.drawable.sponsor_alipay,
+                                caption = "支付宝",
+                                aspect = 0.666f,
+                                modifier = Modifier.weight(1f),
+                            )
+                            SponsorCode(
+                                image = R.drawable.sponsor_wechat,
+                                caption = "微信",
+                                aspect = 0.734f,
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                    }
+                }
             }
         }
+    }
+}
+
+/**
+ * 一张收款码。
+ *
+ * 统一压成白底 + 圆角:两张原图的底色分别是蓝和绿,直接放进深色卡片会各唱各的调。
+ * 比例按原图给(而不是硬拉成正方形)—— 二维码被拉伸会扫不出来。
+ */
+@Composable
+private fun SponsorCode(
+    image: Int,
+    caption: String,
+    aspect: Float,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Image(
+            painter = painterResource(image),
+            contentDescription = caption + "收款码",
+            contentScale = ContentScale.Fit,
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(aspect)
+                .clip(RoundedCornerShape(Radii.card))
+                .background(Color.White),
+        )
+        Spacer(Modifier.height(Spacing.xxs))
+        Text(
+            text = caption,
+            style = MaterialTheme.typography.labelMedium,
+            color = colors.inkMuted,
+        )
     }
 }
 

@@ -127,6 +127,22 @@
         <span id="app-version">—</span>
       </p>
     </div>
+
+    <!-- 赞助。放在最底下,因为它是"用着顺手再说"的东西,不是入口。 -->
+    <div class="card" id="card-sponsor">
+      <h2>赞助</h2>
+      <p class="sponsor-line">觉得好用的请我喝一杯咖啡吧 🌟</p>
+      <div class="sponsor-codes">
+        <a href="sponsor-alipay.jpg" target="_blank" rel="noopener">
+          <img src="sponsor-alipay.jpg" alt="支付宝收款码" loading="lazy">
+          <span>支付宝</span>
+        </a>
+        <a href="sponsor-wechat.jpg" target="_blank" rel="noopener">
+          <img src="sponsor-wechat.jpg" alt="微信收款码" loading="lazy">
+          <span>微信</span>
+        </a>
+      </div>
+    </div>
   </section>
 
 </main>
@@ -149,7 +165,13 @@
   <video id="scan-video" playsinline muted autoplay></video>
   <div class="scan-frame" aria-hidden="true"></div>
   <p class="scan-hint">对准机器上的二维码</p>
-  <button class="ghost" id="btn-scan-cancel" type="button">取消</button>
+  <!-- 相册:机器上的贴纸已经拍过照、或者别人发来一张截图时,不必再跑到机器前。
+       iOS 上这个按钮会弹「照片图库 / 拍照 / 浏览」,顺带也覆盖了"没法实时取景"的场景。 -->
+  <div class="scan-actions">
+    <button class="ghost" id="btn-scan-album" type="button">从相册选择</button>
+    <button class="ghost" id="btn-scan-cancel" type="button">取消</button>
+  </div>
+  <input id="scan-file" type="file" accept="image/*" hidden>
   <p class="status" id="scan-status"></p>
 </div>
 

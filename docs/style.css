@@ -322,6 +322,35 @@ body {
 .scan-hint { margin: 0; color: #e9eef6; font-size: 14px; letter-spacing: .5px; }
 .scan .status { margin: 0; }
 
+/* 两个按钮并排:相册在左,取消在右。相册是"还能做什么",取消只是退路。 */
+.scan-actions { position: relative; z-index: 1; display: flex; gap: 10px; }
+
+/* 摄像头打不开时的样子:收起取景框,只留「从相册选择」。
+   相册这条路不需要摄像头,不该被权限问题连带堵死。 */
+.scan.album-only video,
+.scan.album-only .scan-frame { display: none; }
+
+/* ---------------- 赞助 ---------------- */
+.sponsor-line { margin: 0 0 14px; font-size: 14px; color: var(--ink); }
+
+.sponsor-codes { display: flex; gap: 12px; }
+.sponsor-codes a {
+  flex: 1;
+  display: flex; flex-direction: column; align-items: center; gap: 7px;
+  text-decoration: none;
+}
+.sponsor-codes img {
+  width: 100%;
+  /* 统一成 3:4,两张码的底边和下面的名字才对得齐。`contain` 而不是 `cover`:
+     二维码被裁掉一角就扫不出来了。 */
+  aspect-ratio: 3 / 4;
+  object-fit: contain;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,.10);
+  background: #fff;
+}
+.sponsor-codes span { font-size: 12px; color: var(--ink-muted); }
+
 .status { min-height: 20px; margin: 14px 0 0; font-size: 13px; color: var(--danger); text-align: center; }
 .status.ok { color: var(--cooling); }
 

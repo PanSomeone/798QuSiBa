@@ -40,7 +40,7 @@ const VERSION_CODE = '40000';
  * 两边各自记一个数字迟早会漂,所以 `tools/verify-v1.2.ps1` 里有一条检查:这两个值
  * 必须相等。改一处忘另一处会让校验脚本红,而不是让用户在设置里看到一个旧版本。
  */
-const APP_VERSION = '1.3.0';
+const APP_VERSION = '1.3.1';
 
 /** 网关的业务码。0 是成功,-99 是所有需鉴权接口共用的会话失效。 */
 const CODE_OK = 0;
@@ -537,6 +537,7 @@ const scanner = {
     }
 
     $('scan-overlay').classList.remove('hidden');
+    $('scan-overlay').classList.remove('album-only');
 
     try {
       this.stream = await navigator.mediaDevices.getUserMedia({
@@ -546,8 +547,10 @@ const scanner = {
         audio: false,
       });
     } catch (e) {
-      closeScan();
-      setStatus($('settings-status'), cameraProblem(e));
+      // 摄像头打不开不该堵死扫码 —— 相册那条路根本不需要摄像头。
+      // 收掉取景框,只留「从相册选择」,把原因写在下面对话里。
+      $('scan-overlay').classList.add('album-only');
+      setStatus(status, cameraProblem(e) + '。可以从相册选一张');
       return;
     }
 
@@ -557,6 +560,7 @@ const scanner = {
 
     this.decoder = await makeDecoder();
     if (!this.decoder) {
+      // 连解码器都没有时才真的没救:相册也用不了。
       closeScan();
       setStatus($('settings-status'), '这个浏览器既没有 BarcodeDetector，也没加载到 vendor/jsQR.js');
       return;
@@ -651,8 +655,85 @@ function cameraProblem(error) {
 function closeScan() {
   scanner.stop();
   const overlay = $('scan-overlay');
-  if (overlay) overlay.classList.add('hidden');
+  if (overlay) {
+    overlay.classList.add('hidden');
+    overlay.classList.remove('album-only');
+  }
   setStatus($('scan-status'), '');
+}
+
+/**
+ * 从相册里的一张图认二维码。
+ *
+ * 需要它是因为"实时取景"不总是可用:贴纸可能已经拍过照、截图是别人发来的、
+ * 或者摄像头权限被拒(那种情况下取景框会退成"只有相册"的样子)。
+ *
+ * 和实时取景共用同一套解码器选择,只是喂进去的是图片而不是视频帧。裁剪范围用
+ * 原图尺寸、最长边不超过 1200 —— 再大只是让逐像素扫描更慢,二维码不会因此更清楚。
+ */
+async function scanFromAlbum(file) {
+  const status = $('scan-status');
+  setStatus(status, '正在识别…', true);
+
+  let source = null;
+  try {
+    source = await createImageBitmap(file);
+  } catch {
+    // 老一点的 Safari 没有 createImageBitmap,用 <img> 也一样能画进 canvas。
+    try {
+      source = await new Promise((resolve, reject) => {
+        const image = new Image();
+        image.onload = () => resolve(image);
+        image.onerror = () => reject(new Error('decode failed'));
+        image.src = URL.createObjectURL(file);
+      });
+    } catch {
+      setStatus(status, '这张图读不出来，换一张试试');
+      return;
+    }
+  }
+
+  let text = null;
+  try {
+    if (!scanner.decoder) scanner.decoder = await makeDecoder();
+    text = await decodeImage(source, source.width, source.height);
+  } catch (e) {
+    setStatus(status, '识别失败：' + e.message);
+    return;
+  }
+
+  if (!text) {
+    setStatus(status, '这张图里没有认出二维码，换一张试试');
+    return;
+  }
+
+  console.log(`Scan code ${text.length} chars (from album): ${text}`);
+  closeScan();
+  onScanText(text);
+}
+
+/** 把一张图交给当前解码器。`source` 可以是 ImageBitmap 或 HTMLImageElement。 */
+async function decodeImage(source, width, height) {
+  if (scanner.decoder.kind === 'native') {
+    const codes = await scanner.decoder.detector.detect(source);
+    return codes && codes.length ? codes[0].rawValue : null;
+  }
+
+  const scale = Math.min(1, 1200 / Math.max(width, height));
+  const w = Math.max(1, Math.round(width * scale));
+  const h = Math.max(1, Math.round(height * scale));
+
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(source, 0, 0, w, h);
+  const frame = ctx.getImageData(0, 0, w, h);
+
+  // 照片可能是深色模式下的截图(白码黑底),所以这一路要两种极性都试;
+  // 实时取景不开这个,它对每一帧都翻一次,纯属浪费。
+  const found = window.jsQR(frame.data, w, h, { inversionAttempts: 'attemptBoth' });
+  return found ? found.data : null;
 }
 
 /**
@@ -762,6 +843,13 @@ function bind() {
 
   $('btn-scan').onclick = () => scanner.open();
   $('btn-scan-cancel').onclick = () => closeScan();
+  $('btn-scan-album').onclick = () => $('scan-file').click();
+  $('scan-file').onchange = async (event) => {
+    const file = event.target.files && event.target.files[0];
+    // 清空 value:同一张图连选两次,第二次不会触发 change。
+    event.target.value = '';
+    if (file) await scanFromAlbum(file);
+  };
 
   $('btn-logout').onclick = () => {
     store.token = '';
