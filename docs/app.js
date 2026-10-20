@@ -92,6 +92,54 @@ const store = {
  * HTTP 200,真正的答案在 body 的 `code` 里,所以「请求成功」和「事情成功」是两件
  * 事,调用方必须看 code。
  */
+/**
+ * 最近几次调用的「我发了什么 / 它回了什么」。
+ *
+ * 加这一段的原因很具体:同一个包、同一个账号,在模拟器上能开阀,在手机上被
+ * 「请升级最新版APP」挡住,而页面和日志里能看的东西全都一样。看不见的那一项是
+ * 请求头,所以把它记下来,并且让人能一键复制走。
+ *
+ * 只记不敏感的东西:接口路径、ApplicationType、VersionCode、HTTP 状态、业务码和
+ * 服务器原话。**token 一个字都不进这里**。
+ */
+const diag = [];
+
+function recordDiag(entry) {
+  diag.push(entry);
+  if (diag.length > 12) diag.shift();
+  renderDiag();
+}
+
+function renderDiag() {
+  const out = document.getElementById('diag-out');
+  if (!out) return;
+  out.textContent = diag.length
+    ? diag.map((d, i) => `${String(i + 1).padStart(2, '0')}  ${d}`).join('\n')
+    : '还没有请求。';
+}
+
+async function copyDiag() {
+  const out = document.getElementById('diag-out');
+  if (!out) return;
+  const text = out.textContent || '';
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    // 剪贴板 API 在非 https 或没授权时会拒绝,退回到老办法。
+    const range = document.createRange();
+    range.selectNodeContents(out);
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+    document.execCommand('copy');
+  }
+  const button = document.getElementById('diag-copy');
+  if (button) {
+    button.textContent = '已复制';
+    setTimeout(() => { button.textContent = '复制诊断'; }, 1600);
+  }
+}
+
 async function api(path, { method = 'GET', body = null, token, applicationType = '1,1' } = {}) {
   const headers = {
     'Accept': 'application/json',
@@ -113,6 +161,7 @@ async function api(path, { method = 'GET', body = null, token, applicationType =
     });
   } catch (e) {
     // 走到这里几乎只有两种可能:断网,或者网关把跨域放行改掉了
+    recordDiag(`${method} ${path} · at=${applicationType} vc=${VERSION_CODE} → 网络错误：${e.message}`);
     return { code: null, msg: '网络连不上，或者网关不再允许跨域：' + e.message, data: null, http: 0 };
   }
 
@@ -135,6 +184,12 @@ async function api(path, { method = 'GET', body = null, token, applicationType =
   if (code !== null && code !== CODE_OK) {
     console.warn(`[api] ${method} ${path} -> code=${code} msg=${message || '(empty)'}`);
   }
+
+  // 每一次都记,成功也记:需要对比的恰恰是「同一个头,一次过、一次不过」。
+  recordDiag(
+    `${method} ${path} · at=${applicationType} vc=${VERSION_CODE}` +
+    ` → http=${response.status} code=${code === null ? '?' : code} ${message || ''}`.trimEnd(),
+  );
 
   return {
     code,
@@ -876,6 +931,12 @@ function bind() {
   };
 
   $('app-version').textContent = APP_VERSION;
+
+  const copyButton = $('diag-copy');
+
+  if (copyButton) copyButton.onclick = copyDiag;
+
+  renderDiag();
 
   // 默认那页是短信登录,而它的图形验证码要自己拉一张 —— 否则用户看到的是一个空框。
   refreshCaptcha();

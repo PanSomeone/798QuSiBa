@@ -364,6 +364,24 @@ body {
 .links { display: flex; align-items: center; gap: 8px; margin: 0; }
 .links span { color: var(--ink-faint); }
 
+/* 诊断块：等宽、小字、可滚动。它是给「复制下来发给别人看」用的，不是给人读的排版。 */
+.diag-hint { font-size: 12px; color: var(--ink-faint); margin: 0 0 10px; }
+.diag {
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  max-height: 210px;
+  overflow: auto;
+  font: 11px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: var(--ink-muted);
+  background: rgba(0, 0, 0, .28);
+  border: 1px solid rgba(255, 255, 255, .07);
+  border-radius: 10px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
 a { color: var(--water); text-decoration: none; }
 a:active { opacity: .7; }
 code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; color: var(--water); }
