@@ -94,6 +94,11 @@ foreach ($f in $files) {
     if (-not (Test-Path $src)) { throw "missing $($f.path)" }
     $copy = Join-Path $env:TEMP $f.name
     Copy-Item $src $copy -Force
+    # Hash the copy, now, while this loop owns it: the GitHub publish may be running
+    # in parallel and holding the build output open, and a Get-FileHash on a locked
+    # file aborts the verification with "being used by another process".
+    $f.sha = (Get-FileHash $copy -Algorithm SHA256).Hash
+    $f.size = (Get-Item $copy).Length
     $uploadUrl = "https://gitee.com/api/v5/repos/$owner/$repoName/releases/$($release.id)/attach_files?access_token=$token"
     $resp = curl.exe -sS -X POST -H "Authorization: token $token" -F "file=@$copy" $uploadUrl
     Write-Host ("upload {0}: {1}" -f $f.name, $resp.Substring(0, [Math]::Min(200, $resp.Length)))
@@ -110,11 +115,8 @@ foreach ($asset in $after.assets) {
     $tmp = Join-Path $env:TEMP ('gitee-dl-' + $asset.name)
     $code = curl.exe -sS -L --max-time 300 -o $tmp -w '%{http_code}' $asset.browser_download_url
     $size = if (Test-Path $tmp) { (Get-Item $tmp).Length } else { 0 }
-    $localPath = Join-Path $repo $match.path
-    $localSha = (Get-FileHash $localPath -Algorithm SHA256).Hash
-    $localSize = (Get-Item $localPath).Length
     $sha = if ($size -gt 0) { (Get-FileHash $tmp -Algorithm SHA256).Hash } else { '' }
-    $same = ($sha -eq $localSha) -and ($size -eq $localSize)
+    $same = ($sha -eq $match.sha) -and ($size -eq $match.size)
     Write-Host ("{0} http={1} {2} B identical={3}" -f $asset.name, $code, $size, $same)
     if ($same) { $verified++ }
     Remove-Item $tmp -Force -ErrorAction SilentlyContinue
