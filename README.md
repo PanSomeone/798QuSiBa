@@ -75,7 +75,7 @@ app/src/main/java/com/killhuishenghuo/
 
 ## 反馈
 
-无服务器、无邮箱，反馈走 [GitHub Issues](https://github.com/PanSomeone/798QuSiBa/issues/new)。设置页「反馈」可生成脱敏诊断文本，不含 token。想支持就 [点个 Star](https://github.com/PanSomeone/798QuSiBa)。
+无服务器、无邮箱，反馈走 [GitHub Issues](https://github.com/PanSomeone/798QuSiBa/issues/new)，或者在 QQ 群 `1126108304` 里直接说。设置页「反馈」可生成脱敏诊断文本，不含 token。想支持就 [点个 Star](https://github.com/PanSomeone/798QuSiBa)。
 
 ## 许可与用途
 

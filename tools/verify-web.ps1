@@ -155,6 +155,38 @@ function loadFrame(src, waitMs) {
   noticed.remove();
   localStorage.removeItem('huishui.notice');
 
+  // ---- the QQ group row ----
+  // The number is the whole feature: if it is not on screen, a user with a question
+  // and no GitHub account has nowhere to go. Clicking it cannot be asserted down to
+  // "the clipboard now holds 1126108304" -- headless Edge has no user activation, so
+  // the copy may take either of two paths -- but it must always leave the number
+  // readable on the page.
+  const settings = await loadFrame('index.html?demo=1&screen=settings', 1200);
+  try {
+    const doc = settings.contentDocument;
+    const qq = doc.getElementById('qq-copy');
+    const hint = doc.getElementById('qq-hint');
+    record('the QQ group row shows the group number',
+      Boolean(qq) && ((qq.textContent || '').indexOf('1126108304') >= 0));
+    record('the QQ group row has a hint beside it', Boolean(hint));
+    if (qq) {
+      qq.click();
+      await new Promise((r) => setTimeout(r, 300));
+      const said = (hint.textContent || '').trim();
+      record('pressing the QQ row tells the user what happened',
+        said.length > 0 && (said.indexOf('1126108304') >= 0 || said.length > 3),
+        'hint=' + said.slice(0, 24));
+      const box = qq.getBoundingClientRect();
+      record('the QQ group row fits inside the page',
+        box.width > 0 && box.left >= 0 && box.right <= doc.documentElement.clientWidth + 1,
+        'left=' + Math.round(box.left) + ' right=' + Math.round(box.right) +
+        ' page=' + doc.documentElement.clientWidth);
+    }
+  } catch (e) {
+    record('settings frame readable', false, e.message);
+  }
+  settings.remove();
+
   flush();
   // The verdict goes in the title, not in the body: this page's own source contains
   // the strings 'PASS ' and 'FAIL ', so grepping the dumped document for them also

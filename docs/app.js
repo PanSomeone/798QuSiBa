@@ -42,7 +42,15 @@ const VERSION_CODE = new URLSearchParams(location.search).get("vc") || "31009";
  * 两边各自记一个数字迟早会漂,所以 `tools/verify-v1.2.ps1` 里有一条检查:这两个值
  * 必须相等。改一处忘另一处会让校验脚本红,而不是让用户在设置里看到一个旧版本。
  */
-const APP_VERSION = '1.3.4';
+const APP_VERSION = '1.3.5';
+
+/**
+ * 用户群群号,和安卓端 `ProjectLinks.QQ_GROUP` 是同一个数字。
+ *
+ * 只存数字,不存网址:QQ 群没有公开网页,`qm.qq.com` 的邀请链需要每群一个密钥,
+ * 编一个出来就是死链。所以这一行是「点一下复制群号」,剩下的交给 QQ 的搜索框。
+ */
+const QQ_GROUP = '1126108304';
 
 /** 网关的业务码。0 是成功,-99 是所有需鉴权接口共用的会话失效。 */
 const CODE_OK = 0;
@@ -139,6 +147,48 @@ async function copyDiag() {
   if (button) {
     button.textContent = '已复制';
     setTimeout(() => { button.textContent = '复制诊断'; }, 1600);
+  }
+}
+
+/**
+ * 把群号放进剪贴板。
+ *
+ * 浏览器里没有「打开 QQ」这回事 —— 网页也没法唤起 App 的群卡片(那要
+ * `mqqapi://`,移动版 Safari/Chrome 都会把它当协议错误拦掉)。所以这个按钮承诺
+ * 的只有复制,而复制是浏览器里唯一肯定能做到的事。
+ */
+async function copyQQGroup() {
+  const hint = $('qq-hint');
+  try {
+    await navigator.clipboard.writeText(QQ_GROUP);
+  } catch {
+    // 剪贴板 API 被拒(非 https、或用户没授权)时退回老办法:临时选中一段文本。
+    const area = document.createElement('textarea');
+    area.value = QQ_GROUP;
+    area.setAttribute('readonly', '');
+    // 放在视野外而不是 hidden:display:none 的节点选不中,也就复制不了。
+    area.style.position = 'fixed';
+    area.style.top = '-40px';
+    area.style.opacity = '0';
+    document.body.appendChild(area);
+    area.select();
+    try {
+      document.execCommand('copy');
+    } catch {
+      // 两条路都堵住时不再假装成功,直接让人自己记下这个数字。
+      if (hint) hint.textContent = QQ_GROUP;
+      document.body.removeChild(area);
+      return;
+    }
+    document.body.removeChild(area);
+  }
+  if (hint) {
+    hint.textContent = '已复制，去 QQ 里搜一下';
+    hint.classList.add('copied');
+    setTimeout(() => {
+      hint.textContent = '点一下复制群号';
+      hint.classList.remove('copied');
+    }, 1600);
   }
 }
 
@@ -937,6 +987,10 @@ function bind() {
   const copyButton = $('diag-copy');
 
   if (copyButton) copyButton.onclick = copyDiag;
+
+  const qqButton = $('qq-copy');
+
+  if (qqButton) qqButton.onclick = copyQQGroup;
 
   renderDiag();
 

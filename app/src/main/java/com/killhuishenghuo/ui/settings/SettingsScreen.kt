@@ -34,10 +34,12 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.DevicesOther
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Logout
@@ -142,6 +144,11 @@ fun SettingsScreen(
     var feedback by remember { mutableStateOf("") }
     var copied by remember { mutableStateOf(false) }
 
+    // Separate from `copied` on purpose: that one is about the diagnostic block,
+    // and the two rows sit next to each other. One flag would light up both
+    // rows' confirmation for whichever of them was pressed.
+    var qqCopied by remember { mutableStateOf(false) }
+
     // 收款码是弹出来的,不是铺在设置里的:它是"这一行点进去才需要看"的东西,
     // 常驻会把整页撑长,而且抢了上面那些真正每天要用的行。
     var showSponsor by remember { mutableStateOf(false) }
@@ -158,6 +165,13 @@ fun SettingsScreen(
         if (copied) {
             kotlinx.coroutines.delay(ClipboardConfirmationMillis)
             copied = false
+        }
+    }
+
+    LaunchedEffect(qqCopied) {
+        if (qqCopied) {
+            kotlinx.coroutines.delay(ClipboardConfirmationMillis)
+            qqCopied = false
         }
     }
 
@@ -290,6 +304,15 @@ fun SettingsScreen(
                             )
                             copied = true
                         },
+                    )
+
+                    // 群排在 issue 下面:能提 issue 的人本来就会提,这一行是给
+                    // 没装、也不想装 GitHub 的人留的门。文案只放群号,不写"欢迎
+                    // 加入"那类话 —— 点了会发生什么,detail 一行就说清了。
+                    Hairline()
+                    QQGroupRow(
+                        copied = qqCopied,
+                        onCopied = { qqCopied = true },
                     )
                 }
             }
@@ -819,6 +842,61 @@ private fun openUrl(context: Context, url: String) {
             Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
         )
     }.onFailure { AppLog.error("Link", it, "打不开 $url") }
+}
+
+/**
+ * Hands a non-http scheme to whichever app claims it, and says whether one did.
+ *
+ * Separate from [openUrl] because the failure means something different here: a
+ * missing browser is a bug worth logging, but a missing QQ is not — the row has
+ * already put the group number on the clipboard, which is the fallback it
+ * promises. So this logs at info level and never shows the user an error.
+ */
+private fun openDeepLink(context: Context, uri: String): Boolean = runCatching {
+    context.startActivity(
+        Intent(Intent.ACTION_VIEW, Uri.parse(uri)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+    )
+    true
+}.getOrElse {
+    AppLog.log("Link", "no app claimed $uri; the number is on the clipboard instead")
+    false
+}
+
+/**
+ * The user-group row.
+ *
+ * Tapping it copies the number first and then *tries* to open the group, in
+ * that order, because the copy is the part that cannot fail. On a phone with QQ
+ * installed the app switches over before the user reads the confirmation; on a
+ * phone without it, the confirmation is the whole feature.
+ */
+@Composable
+private fun QQGroupRow(
+    copied: Boolean,
+    onCopied: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val context = LocalContext.current
+
+    SettingRow(
+        icon = Icons.Filled.Groups,
+        label = "QQ 反馈群",
+        detail = if (copied) ProjectLinks.QQ_GROUP_COPIED else "${ProjectLinks.QQ_GROUP} · 点一下复制群号",
+        trailing = {
+            Icon(
+                imageVector = if (copied) Icons.Filled.Check else Icons.Filled.ContentCopy,
+                contentDescription = null,
+                tint = if (copied) colors.water else colors.inkFaint,
+                modifier = Modifier.size(16.dp),
+            )
+        },
+        modifier = modifier,
+        onClick = {
+            copyToClipboard(context, ProjectLinks.QQ_GROUP)
+            onCopied()
+            openDeepLink(context, ProjectLinks.QQ_GROUP_SCHEME)
+        },
+    )
 }
 
 /**

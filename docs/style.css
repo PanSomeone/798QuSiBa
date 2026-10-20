@@ -364,6 +364,20 @@ body {
 .links { display: flex; align-items: center; gap: 8px; margin: 0; }
 .links span { color: var(--ink-faint); }
 
+/* 群号按钮：长得像链接，因为它在这一行里的角色就是链接——只是它复制而不是跳转。
+   水蓝色让它在两行灰字里被找到，但它和「复制诊断」不一样，不需要整块按钮。 */
+.qq {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--water);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.qq:active { opacity: .6; }
+#qq-hint.copied { color: var(--cooling); }
+
 /* 诊断块：等宽、小字、可滚动。它是给「复制下来发给别人看」用的，不是给人读的排版。 */
 .diag-hint { font-size: 12px; color: var(--ink-faint); margin: 0 0 10px; }
 .diag {

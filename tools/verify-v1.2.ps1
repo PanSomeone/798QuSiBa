@@ -53,6 +53,7 @@ $T_PENDING      = U '\u5F85\u8865\u5145\u6E05\u5355'                # the retire
 $T_BIND_ROW     = U '\u626B\u7801\u6DFB\u52A0\u8BBE\u5907'          # the scan-to-bind row label
 $T_BIND_BODY    = U '\u52A0\u8FDB\u6765\u7684\u8BBE\u5907\u5C31\u662F'  # the explainer that was cut
 $T_NO_CODE      = U '\u6682\u65F6\u6CA1\u6709\u626B\u5230\u4E8C\u7EF4\u7801'  # the sentence a cancel must produce
+$T_QQ_ROW       = "QQ $T_FEEDBACK" + (U '\u7FA4')                    # the QQ group row label
 
 # A top-level private function's body, so a check can ask what is in scope
 # inside it rather than anywhere in the file. The terminator is the first line
@@ -77,7 +78,7 @@ $qrParser = Slurp 'app\src\main\java\com\killhuishenghuo\data\model\DeviceQr.kt'
 
 Write-Host ""
 Write-Host "1. version" -ForegroundColor Cyan
-Check 'versionName is 1.3.4' ($gradle -match 'versionName\s*=\s*"1\.3\.4"') 'not found in app/build.gradle.kts'
+Check 'versionName is 1.3.5' ($gradle -match 'versionName\s*=\s*"1\.3\.5"') 'not found in app/build.gradle.kts'
 
 # The web client shows a version in Settings, and it is a hand-copied number. Two
 # hand-copied numbers drift; one of them is always right and nobody notices the
@@ -91,7 +92,7 @@ if (Test-Path $webDir) {
         "docs/app.js says '$webVersion', app/build.gradle.kts says '$androidVersion'"
 }
 
-Check 'versionCode is 11'    ($gradle -match 'versionCode\s*=\s*11') `
+Check 'versionCode is 12'    ($gradle -match 'versionCode\s*=\s*12') `
     'Android refuses an install over an equal-or-lower code, and earlier builds are already on a phone'
 
 Write-Host ""
@@ -99,6 +100,17 @@ Write-Host "2. the links exist and agree" -ForegroundColor Cyan
 Check 'ProjectLinks.kt exists'      ($links.Length -gt 0) 'missing'
 Check 'REPOSITORY is the repo'      ($links -match 'https://github\.com/PanSomeone/798QuSiBa') 'wrong or missing URL'
 Check 'NEW_ISSUE derives from it'   ($links -match 'const val NEW_ISSUE = "\$REPOSITORY/issues/new"') 'the two can drift apart'
+
+# The user group is a number, and it is typed in two source files that never import
+# each other: the app's ProjectLinks and the page's app.js. Same rule as the version
+# - two hand-copied values drift, so the check is the rule.
+Check 'QQ_GROUP is the group the user gave' ($links -match 'const val QQ_GROUP = "1126108304"') `
+    'app/src/main/java/com/killhuishenghuo/core/ProjectLinks.kt'
+$androidGroup = if ($links -match 'QQ_GROUP = "([0-9]{6,12})"') { $Matches[1] } else { "" }
+$webGroupJs = if (Test-Path 'docs\app.js') { Get-Content 'docs\app.js' -Raw -Encoding UTF8 } else { "" }
+$webGroup = if ($webGroupJs -match "QQ_GROUP = '([0-9]{6,12})'") { $Matches[1] } else { "" }
+Check 'the QQ group is one number, not two' ($webGroup -ne '' -and $webGroup -eq $androidGroup) `
+    "docs/app.js says '$webGroup', ProjectLinks.kt says '$androidGroup'"
 
 Write-Host ""
 Write-Host "3. settings screen wires them up" -ForegroundColor Cyan
@@ -109,6 +121,20 @@ Check 'star row'                    ($settings -match [regex]::Escape($T_STAR_RO
 Check 'issue row'                   ($settings -match [regex]::Escape($T_ASK_ISSUE)) 'missing'
 Check 'feedback opens the form'     ($settings -match 'openUrl\(context, ProjectLinks\.NEW_ISSUE\)') 'the button is not wired'
 Check 'version row is unchanged'    ($settings -match 'BuildConfig\.VERSION_NAME') 'the version row should read from BuildConfig'
+
+Check 'the QQ group row exists'     ($settings -match [regex]::Escape("label = `"$T_QQ_ROW`"")) `
+    'missing - expected in the feedback section'
+Check 'the QQ group row reads the number from ProjectLinks' `
+    ($settings -match 'ProjectLinks\.QQ_GROUP\b') 'a typed-out number here would drift from the one the page shows'
+
+# Order matters and is the whole design: the copy cannot fail, opening QQ can.
+# Written backwards (open first, copy second) the row still looks right on a phone
+# with QQ installed and silently does nothing on one without it.
+$qqBody = Body $settings 'QQGroupRow'
+$copyAt = if ($qqBody) { $qqBody.IndexOf('copyToClipboard') } else { -1 }
+$openAt = if ($qqBody) { $qqBody.IndexOf('openDeepLink') } else { -1 }
+Check 'the row copies before it tries to open QQ' ($copyAt -ge 0 -and $openAt -gt $copyAt) `
+    'copy first: it is the half that works on a phone that has never installed QQ'
 
 # The bug this script was written too late to catch: `openUrl(context, ...)`
 # inside a function that has no `context` compiles to a call on the stdlib
