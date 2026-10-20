@@ -92,55 +92,90 @@ fun NoticeBanner(
     }
 
     if (expanded) {
-        ModalBottomSheet(
+        NoticeSheet(
+            notice = notice,
             onDismissRequest = { expanded = false },
-            containerColor = colors.surfaceRaised,
+            actionLabel = "知道了",
+            onAction = {
+                expanded = false
+                onDismiss(notice.id)
+            },
+        )
+    }
+}
+
+/**
+ * 一条公告的全文,底部弹层。
+ *
+ * 从 [NoticeBanner] 里抽出来,因为「历史公告」也要看同一篇全文:两处各写一份,迟早
+ * 会出现"横幅上有的链接在历史里没有"这种没人会发现的差别。
+ *
+ * [actionLabel] 是参数而不是写死「知道了」:在主屏它是"这条我读过了",在历史里只是
+ * "关掉",同一个按钮说两件事才诚实。
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun NoticeSheet(
+    notice: Notice,
+    onDismissRequest: () -> Unit,
+    actionLabel: String,
+    onAction: () -> Unit,
+) {
+    val uriHandler = LocalUriHandler.current
+
+    ModalBottomSheet(
+        onDismissRequest = onDismissRequest,
+        containerColor = colors.surfaceRaised,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.lg)
+                .padding(bottom = Spacing.lg),
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = Spacing.lg)
-                    .padding(bottom = Spacing.lg),
-            ) {
+            if (!notice.date.isNullOrBlank()) {
                 Text(
-                    text = notice.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = colors.ink,
+                    text = notice.date,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = colors.inkFaint,
                 )
-                if (notice.body.isNotBlank()) {
-                    Spacer(Modifier.height(Spacing.sm))
-                    Text(
-                        text = notice.body,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = colors.inkMuted,
-                    )
+                Spacer(Modifier.height(Spacing.xxs))
+            }
+            Text(
+                text = notice.title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = colors.ink,
+            )
+            if (notice.body.isNotBlank()) {
+                Spacer(Modifier.height(Spacing.sm))
+                Text(
+                    text = notice.body,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = colors.inkMuted,
+                )
+            }
+            Spacer(Modifier.height(Spacing.md))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (notice.url.isNotBlank()) {
+                    TextButton(onClick = { runCatching { uriHandler.openUri(notice.url) } }) {
+                        Text("打开链接", color = colors.water)
+                    }
                 }
-                Spacer(Modifier.height(Spacing.md))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                    verticalAlignment = Alignment.CenterVertically,
+                Spacer(Modifier.weight(1f))
+                Button(
+                    onClick = onAction,
+                    shape = RoundedCornerShape(Radii.chip),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = colors.water,
+                        contentColor = colors.onWater,
+                    ),
                 ) {
-                    if (notice.url.isNotBlank()) {
-                        TextButton(onClick = { runCatching { uriHandler.openUri(notice.url) } }) {
-                            Text("打开链接", color = colors.water)
-                        }
-                    }
-                    Spacer(Modifier.weight(1f))
-                    Button(
-                        onClick = {
-                            expanded = false
-                            onDismiss(notice.id)
-                        },
-                        shape = RoundedCornerShape(Radii.chip),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = colors.water,
-                            contentColor = colors.onWater,
-                        ),
-                    ) {
-                        Text("知道了")
-                    }
+                    Text(actionLabel)
                 }
             }
         }

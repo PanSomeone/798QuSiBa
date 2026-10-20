@@ -95,6 +95,7 @@ import com.killhuishenghuo.core.log.LogExporter
 import com.killhuishenghuo.LastRefusal
 import com.killhuishenghuo.data.local.ThemeMode
 import com.killhuishenghuo.data.model.Device
+import com.killhuishenghuo.data.notice.Notice
 import com.killhuishenghuo.ui.login.AuthUiState
 import com.killhuishenghuo.ui.login.AuthViewModel
 import com.killhuishenghuo.ui.login.CaptchaBox
@@ -136,6 +137,7 @@ fun SettingsScreen(
     onBindScanned: (String) -> Unit = {},
     updateState: UpdateUiState = UpdateUiState.Idle,
     onCheckUpdate: () -> Unit = {},
+    noticeHistory: List<Notice> = emptyList(),
     onSignOut: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
@@ -317,6 +319,10 @@ fun SettingsScreen(
                 }
             }
 
+            item(key = "notice-history") {
+                NoticeHistorySection(notices = noticeHistory)
+            }
+
             item(key = "about") {
                 Section(title = "关于") {
                     ProjectRow(
@@ -476,7 +482,7 @@ private fun SponsorCode(
  * is all rows, that reads as one more row.
  */
 @Composable
-private fun Section(
+internal fun Section(
     title: String,
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
@@ -559,7 +565,7 @@ internal fun SettingRow(
 }
 
 @Composable
-private fun Hairline(modifier: Modifier = Modifier) {
+internal fun Hairline(modifier: Modifier = Modifier) {
     HorizontalDivider(
         modifier = modifier.padding(start = Spacing.md + 18.dp + Spacing.md),
         thickness = 1.dp,
@@ -836,7 +842,7 @@ private fun ProjectRow(
  * start are two separate questions on Android, and a device can answer the
  * first one yes and then throw on the second. Catching the throw answers both.
  */
-private fun openUrl(context: Context, url: String) {
+internal fun openUrl(context: Context, url: String) {
     runCatching {
         context.startActivity(
             Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),

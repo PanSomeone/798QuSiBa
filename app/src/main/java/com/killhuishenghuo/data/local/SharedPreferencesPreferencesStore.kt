@@ -37,10 +37,22 @@ class SharedPreferencesPreferencesStore(context: Context) : PreferencesStore {
         get() = prefs.getString(KEY_NOTICE_FEED, null)
         set(value) = prefs.edit { putString(KEY_NOTICE_FEED, value) }
 
-    override var noticeDismissedId: String?
-        get() = prefs.getString(KEY_NOTICE_DISMISSED, null)?.takeIf { it.isNotBlank() }
+    override var noticeDismissedIds: Set<String>
+        get() {
+            // Before this was a set it was a single id under its own key. Anyone who
+            // dismissed a notice on 1.3.5 or earlier still has that key, and seeing
+            // the same notice again after updating would read as "the button is
+            // broken". Union instead of a one-shot migration: the read is free, and
+            // there is no ordering in which a user sees a dismissal come back.
+            val legacy = prefs.getString(KEY_NOTICE_DISMISSED_LEGACY, null)?.takeIf { it.isNotBlank() }
+            val stored = prefs.getStringSet(KEY_NOTICE_DISMISSED, emptySet()).orEmpty()
+            return if (legacy == null) stored else stored + legacy
+        }
         set(value) = prefs.edit {
-            if (value.isNullOrBlank()) remove(KEY_NOTICE_DISMISSED) else putString(KEY_NOTICE_DISMISSED, value)
+            // `putStringSet` copies, so a caller holding the returned set cannot mutate
+            // what is on disk behind our back.
+            putStringSet(KEY_NOTICE_DISMISSED, value)
+            remove(KEY_NOTICE_DISMISSED_LEGACY)
         }
 
     private companion object {
@@ -49,6 +61,7 @@ class SharedPreferencesPreferencesStore(context: Context) : PreferencesStore {
         const val KEY_ONBOARDED = "onboarding_done"
         const val KEY_DEVICE = "selected_device_id"
         const val KEY_NOTICE_FEED = "notice_feed_json"
-        const val KEY_NOTICE_DISMISSED = "notice_dismissed_id"
+        const val KEY_NOTICE_DISMISSED = "notice_dismissed_ids"
+        const val KEY_NOTICE_DISMISSED_LEGACY = "notice_dismissed_id"
     }
 }

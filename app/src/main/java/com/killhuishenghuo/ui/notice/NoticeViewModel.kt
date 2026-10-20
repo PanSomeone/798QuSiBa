@@ -33,6 +33,16 @@ class NoticeViewModel(
     private val _notice = MutableStateFlow<Notice?>(null)
     val notice: StateFlow<Notice?> = _notice.asStateFlow()
 
+    /**
+     * 设置里「历史公告」的列表。
+     *
+     * 和 [notice] 从同一份 feed 算出来,但它们回答的是两个问题:`notice` 是"现在
+     * 该不该在顶上贴一条",这个是"发过些什么"。点掉公告不会让它变短 —— 见
+     * [NoticeRules.history]。
+     */
+    private val _history = MutableStateFlow<List<Notice>>(emptyList())
+    val history: StateFlow<List<Notice>> = _history.asStateFlow()
+
     /** 最近一次拿到的 feed,用于点「知道了」之后立刻算出下一条,不必再求网络。 */
     private var feed: NoticeFeed? = null
 
@@ -60,22 +70,25 @@ class NoticeViewModel(
     /**
      * 用户点了「知道了」。
      *
-     * 只记 id 不记时间:同一句话没必要说第二遍,但明天换一条新的必须还能出来。
+     * 累加而不是覆盖:文件里同时挂着两条公告时,覆盖会让两条轮流冒出来。只记 id
+     * 不记时间,是因为同一句话没必要说第二遍,但明天换一条新的必须还能出来。
      */
     fun dismiss(id: String) {
-        preferences.noticeDismissedId = id
+        preferences.noticeDismissedIds = preferences.noticeDismissedIds + id
         publish()
     }
 
     private fun publish() {
-        _notice.value = feed?.let {
+        val current = feed
+        _notice.value = current?.let {
             NoticeRules.visible(
                 feed = it,
                 today = NoticeRules.todayIso(),
                 versionName = versionName,
-                dismissedId = preferences.noticeDismissedId,
+                dismissedIds = preferences.noticeDismissedIds,
             )
         }
+        _history.value = current?.let { NoticeRules.history(it, versionName) }.orEmpty()
     }
 
     private fun parseOrNull(raw: String): NoticeFeed? =

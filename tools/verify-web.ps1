@@ -115,18 +115,21 @@ function loadFrame(src, waitMs) {
   }
 
   // ---- the notice row ----
-  // `?demo=1&notice=1` plants a fake notice, so this needs no network and no editing
-  // of notice.json. What is being checked is the promise: the row only exists when
-  // there is something to say, dismissing it hides it AND is remembered.
+  // `?demo=1&notice=1` plants two fake notices, so this needs no network and no
+  // editing of notice.json. Two, not one, because the second is the point: remembering
+  // a single id made the pair take turns forever -- dismiss the top one and the older
+  // one appears, dismiss that and the first comes back, with no state meaning "read
+  // both". What is checked here is that the row moves on and then actually goes away.
   localStorage.removeItem('huishui.notice');
   const noticed = await loadFrame('index.html?demo=1&notice=1', 1200);
   try {
     const doc = noticed.contentDocument;
     const pill = doc.getElementById('notice-pill');
+    const titleNow = () => (((doc.getElementById('notice-title') || {}).textContent) || '');
     record('the notice row appears when there is a notice',
       Boolean(pill) && !pill.classList.contains('hidden'));
-    record('the notice row carries a title',
-      (((doc.getElementById('notice-title') || {}).textContent) || '').length > 0);
+    const firstTitle = titleNow();
+    record('the notice row carries a title', firstTitle.length > 0);
     // Geometry, not a screenshot: an earlier version of the big button overflowed the
     // right edge and a screenshot looked almost right. The number does not lie.
     const edge = pill.getBoundingClientRect();
@@ -138,21 +141,110 @@ function loadFrame(src, waitMs) {
     record('the notice opens its full text',
       !doc.getElementById('notice-sheet').classList.contains('hidden'));
     doc.getElementById('notice-ok').click();
-    record('dismissing hides the row', pill.classList.contains('hidden'));
-    record('dismissing records the id', (localStorage.getItem('huishui.notice') || '') === 'demo');
+    record('dismissing moves the row on to the next notice',
+      !pill.classList.contains('hidden') && titleNow() !== firstTitle, 'title=' + titleNow());
+    pill.click();
+    doc.getElementById('notice-ok').click();
+    record('dismissing every notice hides the row', pill.classList.contains('hidden'));
+    record('the demo keeps its dismissals in memory',
+      (localStorage.getItem('huishui.notice') || '') === '',
+      'stored=' + (localStorage.getItem('huishui.notice') || ''));
   } catch (e) {
     record('notice frame readable', false, e.message);
   }
+  noticed.remove();
 
-  const again = await loadFrame('index.html?demo=1&notice=1', 900);
+  // ---- the published feed, across a reload ----
+  // The real notice.json, served from this origin; the guest screen keeps the session
+  // out of it. A dismissal has to survive a reload, and the notice that was dismissed
+  // must not come back -- with a single stored id it did, as soon as a second notice
+  // was published underneath it.
+  localStorage.removeItem('huishui.notice');
+  const live = await loadFrame('index.html', 1800);
+  let liveTitle = '';
   try {
+    const doc = live.contentDocument;
+    const pill = doc.getElementById('notice-pill');
+    record('the published notice appears on a real load',
+      Boolean(pill) && !pill.classList.contains('hidden'));
+    liveTitle = (((doc.getElementById('notice-title') || {}).textContent) || '');
+    pill.click();
+    doc.getElementById('notice-ok').click();
+    const stored = localStorage.getItem('huishui.notice') || '';
+    record('a dismissal is stored as a list of ids',
+      stored.charAt(0) === '[' && stored.indexOf('notice-relogin-1') > 0, 'stored=' + stored);
+  } catch (e) {
+    record('live notice frame readable', false, e.message);
+  }
+  live.remove();
+
+  const reloaded = await loadFrame('index.html', 1800);
+  try {
+    const doc = reloaded.contentDocument;
+    const pill = doc.getElementById('notice-pill');
+    const shown = !pill.classList.contains('hidden');
+    const title = (((doc.getElementById('notice-title') || {}).textContent) || '');
     record('a dismissed notice stays dismissed',
-      again.contentDocument.getElementById('notice-pill').classList.contains('hidden'));
+      !(shown && title === liveTitle), 'shown=' + shown + ' title=' + title);
   } catch (e) {
     record('notice reload readable', false, e.message);
   }
-  again.remove();
-  noticed.remove();
+  reloaded.remove();
+
+  // The stored shape changed from one id to a list. Someone who dismissed a notice on
+  // the previous build still has the old string on disk, and seeing that same notice
+  // again after updating reads as "the button is broken".
+  localStorage.setItem('huishui.notice', 'notice-relogin-1');
+  const legacy = await loadFrame('index.html', 1800);
+  try {
+    const doc = legacy.contentDocument;
+    const pill = doc.getElementById('notice-pill');
+    const shown = !pill.classList.contains('hidden');
+    const title = (((doc.getElementById('notice-title') || {}).textContent) || '');
+    record('an old single-id dismissal is still honoured',
+      !(shown && title === liveTitle), 'shown=' + shown + ' title=' + title);
+  } catch (e) {
+    record('legacy notice frame readable', false, e.message);
+  }
+  legacy.remove();
+  localStorage.removeItem('huishui.notice');
+
+  // ---- the notice history in settings ----
+  // The whole point of the archive is that a notice you have already pressed ok on can
+  // still be read again. And pressing one in the history must not record a dismissal --
+  // re-reading old text must not change what the top of the screen says.
+  localStorage.setItem('huishui.notice', 'demo');
+  const history = await loadFrame('index.html?demo=1&notice=1&screen=settings', 1200);
+  try {
+    const doc = history.contentDocument;
+    const card = doc.getElementById('card-notice-history');
+    record('the history card appears when there is a notice',
+      Boolean(card) && !card.classList.contains('hidden'));
+    const rows = card ? card.querySelectorAll('.notice-row') : [];
+    record('the history lists dismissed notices too', rows.length === 2, 'rows=' + rows.length);
+    const dates = card ? card.querySelectorAll('.notice-row-date') : [];
+    record('every history row carries its date', dates.length === rows.length,
+      'dates=' + dates.length + ' rows=' + rows.length);
+    if (rows.length >= 2) {
+      rows[1].click();
+      record('opening a history notice shows its full text',
+        !doc.getElementById('notice-sheet').classList.contains('hidden'));
+      const box = card.getBoundingClientRect();
+      record('the history card fits inside the page',
+        box.width > 0 && box.left >= 0 && box.right <= doc.documentElement.clientWidth + 1,
+        'left=' + Math.round(box.left) + ' right=' + Math.round(box.right) +
+        ' page=' + doc.documentElement.clientWidth);
+      doc.getElementById('notice-ok').click();
+      record('closing a history notice keeps the dismissed id',
+        (localStorage.getItem('huishui.notice') || '') === 'demo',
+        'notice=' + (localStorage.getItem('huishui.notice') || ''));
+      record('closing a history notice closes the sheet',
+        doc.getElementById('notice-sheet').classList.contains('hidden'));
+    }
+  } catch (e) {
+    record('history frame readable', false, e.message);
+  }
+  history.remove();
   localStorage.removeItem('huishui.notice');
 
   // ---- the QQ group row ----
@@ -182,6 +274,11 @@ function loadFrame(src, waitMs) {
         'left=' + Math.round(box.left) + ' right=' + Math.round(box.right) +
         ' page=' + doc.documentElement.clientWidth);
     }
+    // Nothing to say means no empty card: an always-empty block reads as a broken
+    // feature rather than as "nothing has been announced yet".
+    const noHistory = doc.getElementById('card-notice-history');
+    record('no history card when there is no notice',
+      Boolean(noHistory) && noHistory.classList.contains('hidden'));
   } catch (e) {
     record('settings frame readable', false, e.message);
   }
@@ -214,8 +311,12 @@ try {
     Start-Sleep -Seconds 2
 
     Remove-Item $dump -Force -ErrorAction SilentlyContinue
+    # 45s of virtual time: the script loads eight frames in sequence and each one gets a
+    # second or more to settle, because the app pulls a captcha image on boot. At 15s the
+    # budget ran out mid-run and the verdict was never written -- which looks exactly like
+    # a crash and hides every assertion after the cut.
     Start-Process -FilePath $edge `
-        -ArgumentList '--headless=new','--disable-gpu','--virtual-time-budget=15000','--dump-dom',"http://127.0.0.1:$Port/_webtest.html" `
+        -ArgumentList '--headless=new','--disable-gpu','--virtual-time-budget=45000','--dump-dom',"http://127.0.0.1:$Port/_webtest.html" `
         -RedirectStandardOutput $dump -NoNewWindow -Wait | Out-Null
 
     if (-not (Test-Path $dump)) { throw "no DOM dump" }

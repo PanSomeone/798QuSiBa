@@ -39,6 +39,7 @@ import com.killhuishenghuo.core.log.AppLog
 import com.killhuishenghuo.core.net.NetworkModule
 import com.killhuishenghuo.data.local.ThemeMode
 import com.killhuishenghuo.data.model.Device
+import com.killhuishenghuo.data.notice.Notice
 import com.killhuishenghuo.data.notice.NoticeRepository
 import com.killhuishenghuo.data.update.UpdateChecker
 import com.killhuishenghuo.ui.components.GlassScrim
@@ -266,6 +267,7 @@ private fun AppRoot() {
                 )
             }
             val notice by noticeViewModel.notice.collectAsStateWithLifecycle()
+            val noticeHistory by noticeViewModel.history.collectAsStateWithLifecycle()
             LaunchedEffect(Unit) { noticeViewModel.load() }
 
             // A stale session is the one thing that gets its own screen.
@@ -293,6 +295,7 @@ private fun AppRoot() {
                     dark = dark,
                     updateState = updateState,
                     onCheckUpdate = updateViewModel::check,
+                    noticeHistory = noticeHistory,
                     // The flow, not a snapshot of it. Collected inside
                     // `SettingsHost` so that a device refresh recomposes the
                     // settings rows and nothing above them — which is the whole
@@ -447,6 +450,7 @@ private fun SettingsHost(
     dark: Boolean,
     updateState: UpdateUiState,
     onCheckUpdate: () -> Unit,
+    noticeHistory: List<Notice>,
     state: StateFlow<HotWaterUiState>,
     onDeviceSelected: (Device) -> Unit,
     onBindScanned: (String) -> Unit,
@@ -483,6 +487,7 @@ private fun SettingsHost(
         onBindScanned = onBindScanned,
         updateState = updateState,
         onCheckUpdate = onCheckUpdate,
+        noticeHistory = noticeHistory,
         onSignOut = {
             viewModel.signOut()
             onSignOut()

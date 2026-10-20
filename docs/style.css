@@ -493,6 +493,32 @@ code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; c
   text-overflow: ellipsis;
 }
 .notice-more { flex: none; font-size: 12.5px; color: var(--water); }
+
+/* 设置里的「历史公告」:一行一条,日期在右下角的小字里。
+ * 和顶上一行不同,这里不做省略号 —— 标题常常是"一句话的结论",截断就只剩半句。 */
+.notice-history { display: flex; flex-direction: column; }
+.notice-row {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  width: 100%;
+  padding: 11px 2px;
+  border: 0;
+  border-bottom: 1px solid var(--hairline);
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: 13.5px;
+  line-height: 1.5;
+  text-align: left;
+  cursor: pointer;
+}
+.notice-row:last-child { border-bottom: 0; }
+.notice-row:active { opacity: .65; }
+.notice-row-date { font-size: 11.5px; color: var(--ink-faint); }
+.notice-when { margin: 0 0 8px; font-size: 11.5px; color: var(--ink-faint); }
+.notice-when.hidden { display: none; }
 /* 这两条必须写在 .notice / .sheet 之后:.hidden 只有一层类名,和它们同级,
  * 后写的赢 —— 否则 display:flex 会把 display:none 覆盖掉,公告和弹层就永远关不上。 */
 .notice.hidden { display: none; }

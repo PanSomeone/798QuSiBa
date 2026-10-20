@@ -78,7 +78,7 @@ $qrParser = Slurp 'app\src\main\java\com\killhuishenghuo\data\model\DeviceQr.kt'
 
 Write-Host ""
 Write-Host "1. version" -ForegroundColor Cyan
-Check 'versionName is 1.3.5' ($gradle -match 'versionName\s*=\s*"1\.3\.5"') 'not found in app/build.gradle.kts'
+Check 'versionName is 1.3.6' ($gradle -match 'versionName\s*=\s*"1\.3\.6"') 'not found in app/build.gradle.kts'
 
 # The web client shows a version in Settings, and it is a hand-copied number. Two
 # hand-copied numbers drift; one of them is always right and nobody notices the
@@ -92,7 +92,7 @@ if (Test-Path $webDir) {
         "docs/app.js says '$webVersion', app/build.gradle.kts says '$androidVersion'"
 }
 
-Check 'versionCode is 12'    ($gradle -match 'versionCode\s*=\s*12') `
+Check 'versionCode is 13'    ($gradle -match 'versionCode\s*=\s*13') `
     'Android refuses an install over an equal-or-lower code, and earlier builds are already on a phone'
 
 Write-Host ""
@@ -234,6 +234,50 @@ Check 'it builds its own client'    ($updateChecker -match 'OkHttpClient\.Builde
 Check 'it never borrows the gateway client' ($updateChecker -notmatch 'NetworkModule\.okHttpClient\(') `
     'a session token for a water account must never be sent to api.github.com; UpdateCheckerTest pins it over a real socket too'
 Check 'the row is wired in'         ($settings -match 'UpdateRow\(') 'the block is not on the settings screen'
+
+Write-Host ""
+Write-Host "6d. the notice archive" -ForegroundColor Cyan
+# The banner can be dismissed, which used to mean the sentence was gone for good.
+# The archive is the fix, so what is checked here is its two failure modes: rows that
+# disappear when they expire or are acknowledged (then it archives nothing), and a
+# history press that rewrites the dismissed id (then reading an old notice makes the
+# current banner pop back up).
+$noticeKt  = Slurp 'app\src\main\java\com\killhuishenghuo\data\notice\Notice.kt'
+$noticeVm  = Slurp 'app\src\main\java\com\killhuishenghuo\ui\notice\NoticeViewModel.kt'
+$historyUi = Slurp 'app\src\main\java\com\killhuishenghuo\ui\settings\NoticeHistorySection.kt'
+$webApp    = Slurp 'docs\app.js'
+$noticeKtPrefs = Slurp 'app\src\main\java\com\killhuishenghuo\data\local\PreferencesStore.kt'
+
+Check 'a notice can carry a date' ($noticeKt -match '@SerialName\("date"\)') 'null is allowed, but the feed we publish should fill it'
+Check 'the archive rule exists'   ($noticeKt -match 'fun history\(') 'missing NoticeRules.history'
+$historyBody = [regex]::Match($noticeKt, '(?s)fun history\(.*?\}').Value
+Check 'the archive ignores until and dismissed' ($historyBody -ne '' -and $historyBody -notmatch 'until|dismissed') `
+    'filtering by expiry or by "read it" removes exactly the notices an archive exists for'
+Check 'the view model publishes it'  ($noticeVm -match 'val history: StateFlow<List<Notice>>') 'missing history flow'
+Check 'settings shows the archive'   ($settings -match 'NoticeHistorySection\(') 'the block is not on the settings screen'
+Check 'the archive rows reuse the banner sheet' ($historyUi -match 'NoticeSheet\(') `
+    'two sheets means the banner and the archive can disagree about the same notice'
+Check 'the page has the archive too' ($webApp -match 'function renderNoticeHistory') 'docs/app.js'
+Check 'dismissals are a set, not one id' ($noticeKtPrefs -match 'var noticeDismissedIds: Set<String>') `
+    'with a single remembered id, two published notices take turns forever'
+Check 'the view model adds instead of overwriting' ($noticeVm -match 'noticeDismissedIds \+ id') `
+    'overwriting drops the earlier dismissal, so the older notice returns on the next launch'
+Check 'the page remembers a list too' ($webApp -match 'function rememberDismissed') 'docs/app.js'
+Check 'reading an old notice keeps the dismissal' `
+    (($webApp -match 'sheetDismissable') -and ($webApp -match 'textContent = sheetDismissable')) `
+    'a history press that writes huishui.notice makes the dismissed banner reappear'
+
+if (Test-Path 'docs\notice.json') {
+    $feed = Get-Content 'docs\notice.json' -Raw -Encoding UTF8 | ConvertFrom-Json
+    $ids = @($feed.notices | ForEach-Object { $_.id })
+    Check 'the feed carries the re-login notice' ($ids -contains 'notice-relogin-1') ('ids: ' + ($ids -join ','))
+    # Order is priority in both clients. If the new advice is not first, the launch
+    # notice keeps the top slot and nobody sees the sentence that was just written.
+    Check 'the newest notice is first' ($ids.Count -gt 0 -and $ids[0] -eq 'notice-relogin-1') `
+        ('first is ' + ($ids | Select-Object -First 1) + '; notice.json order is the display order')
+    $undated = @($feed.notices | Where-Object { -not $_.date })
+    Check 'every published notice has a date' ($undated.Count -eq 0) ('undated: ' + $undated.Count)
+}
 
 Write-Host ""
 Write-Host "7. what the build actually produced" -ForegroundColor Cyan

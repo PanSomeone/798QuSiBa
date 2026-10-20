@@ -42,7 +42,7 @@ const VERSION_CODE = new URLSearchParams(location.search).get("vc") || "31009";
  * 两边各自记一个数字迟早会漂,所以 `tools/verify-v1.2.ps1` 里有一条检查:这两个值
  * 必须相等。改一处忘另一处会让校验脚本红,而不是让用户在设置里看到一个旧版本。
  */
-const APP_VERSION = '1.3.5';
+const APP_VERSION = '1.3.6';
 
 /**
  * 用户群群号,和安卓端 `ProjectLinks.QQ_GROUP` 是同一个数字。
@@ -1018,10 +1018,57 @@ function bind() {
  * 读不到就当没有公告:一条读不出来的公告不该变成一个弹窗。
  */
 const NOTICE_URL = 'notice.json';
-const NOTICE_KEY = 'huishui.notice'; /* 已经点过「知道了」的那条 id */
+/* 已经点过「知道了」的那几条 id,存成 JSON 数组。见 dismissedIds()。 */
+const NOTICE_KEY = 'huishui.notice';
 
 let notices = [];       /* 最近一次读到的 feed */
 let shownNotice = null; /* 屏幕上正在说的那条 */
+
+/** 弹层里现在是谁,以及「知道了」那一下该不该记账。见 openNoticeSheet。 */
+let sheetNotice = null;
+let sheetDismissable = false;
+
+/** `?demo=1` 下的「知道了」只活在内存里,理由见 rememberDismissed。 */
+let demoDismissed = [];
+
+/**
+ * 点过「知道了」的 id 集合。
+ *
+ * 存集合而不是一个 id:feed 里同时挂着两条公告时,只记最后一条会让两条轮流冒出来
+ * (点掉新的 → 旧的出来 → 点掉旧的 → 新的又回来),而这个循环没有出口。
+ *
+ * 旧版本存的是**单个字符串**,所以读的时候两种形状都认:升级后同一条公告不该又冒出来
+ * 一次,那会像"按钮坏了"。
+ */
+function dismissedIds() {
+  if (state.demo) return demoDismissed;
+  const raw = localStorage.getItem(NOTICE_KEY) || '';
+  if (!raw) return [];
+  const str = String(raw).trim();
+  if (str.charAt(0) === '[') {
+    try {
+      const parsed = JSON.parse(str);
+      return Array.isArray(parsed) ? parsed.map(String) : [];
+    } catch (e) {
+      return [];
+    }
+  }
+  return [str];
+}
+
+function rememberDismissed(id) {
+  const next = dismissedIds().filter((it) => it !== id);
+  next.push(id);
+  /* 只留最近 20 条:这是一份"别看第二遍"的清单,不是历史记录。 */
+  const kept = next.slice(-20);
+  if (state.demo) {
+    /* 演示不写 localStorage:那会把真的「已经看过」清单弄脏,换回自己账号时
+       就会莫名少一条公告。 */
+    demoDismissed = kept;
+    return;
+  }
+  localStorage.setItem(NOTICE_KEY, JSON.stringify(kept));
+}
 
 /** 版本号比大小。读不出来按 0 处理,和安卓端 `Version.compare` 的宽松程度一致。 */
 function compareVersion(a, b) {
@@ -1043,11 +1090,11 @@ function compareVersion(a, b) {
  * 必须一致,否则同一份 notice.json 会在手机上出现、在浏览器里不出现。
  */
 function pickNotice() {
-  const dismissed = localStorage.getItem(NOTICE_KEY) || '';
+  const dismissed = dismissedIds();
   const today = new Date().toISOString().slice(0, 10);
   for (const n of notices) {
     if (!n || !n.id || !n.title) continue;
-    if (n.id === dismissed) continue;
+    if (dismissed.indexOf(n.id) >= 0) continue;
     /* ISO 日期字符串的字典序就是时间序 */
     if (n.until && today > n.until) continue;
     if (n.minVersion && compareVersion(APP_VERSION, n.minVersion) < 0) continue;
@@ -1070,29 +1117,109 @@ function renderNotice() {
 }
 
 function openNotice() {
-  if (!shownNotice) return;
-  $('notice-heading').textContent = shownNotice.title;
-  $('notice-body').textContent = shownNotice.body || '';
+  openNoticeSheet(shownNotice, true);
+}
+
+/**
+ * 打开某一篇全文。
+ *
+ * [dismissable] 是「知道了」和「关闭」的区别:从顶上一行点进来,那句"知道了"是要
+ * 记账的(以后不再出现在顶上);从「历史公告」点进来只是回看,按同一个按钮记账会把
+ * `huishui.notice` 改成那条老公告的 id,顶上那条被顶掉的又会冒出来 —— 读一段旧文字
+ * 不该让屏幕变样。
+ */
+function openNoticeSheet(notice, dismissable) {
+  if (!notice) return;
+  sheetNotice = notice;
+  sheetDismissable = Boolean(dismissable);
+  $('notice-heading').textContent = notice.title;
+  $('notice-body').textContent = notice.body || '';
+  const when = $('notice-date');
+  if (when) {
+    if (notice.date) {
+      when.textContent = notice.date;
+      when.classList.remove('hidden');
+    } else {
+      when.textContent = '';
+      when.classList.add('hidden');
+    }
+  }
   const link = $('notice-link');
-  if (shownNotice.url) {
-    link.href = shownNotice.url;
+  if (notice.url) {
+    link.href = notice.url;
     link.classList.remove('hidden');
   } else {
     link.removeAttribute('href');
     link.classList.add('hidden');
   }
+  $('notice-ok').textContent = sheetDismissable ? '知道了' : '关闭';
   $('notice-sheet').classList.remove('hidden');
 }
 
 function closeNotice() {
   $('notice-sheet').classList.add('hidden');
+  sheetNotice = null;
 }
 
 /** 点过「知道了」只记 id:否则点一次之后,以后发什么都看不见了。 */
 function dismissNotice() {
-  if (shownNotice) localStorage.setItem(NOTICE_KEY, shownNotice.id);
+  if (sheetDismissable && sheetNotice) {
+    rememberDismissed(sheetNotice.id);
+    closeNotice();
+    renderNotice();
+    return;
+  }
   closeNotice();
-  renderNotice();
+}
+
+/**
+ * 这个版本读得懂的公告,含已过期的 —— 和安卓端 `NoticeRules.history` 同一条规则。
+ *
+ * 过期的不算作废,正好是"历史";点过「知道了」的也留着,因为这里就是来找它的。
+ */
+function noticeHistory() {
+  return notices.filter((n) => (
+    n
+    && n.id
+    && n.title
+    && (!n.minVersion || compareVersion(APP_VERSION, n.minVersion) >= 0)
+  ));
+}
+
+/** 把「历史公告」那一块画出来。没有就整块不占位置。 */
+function renderNoticeHistory() {
+  const card = $('card-notice-history');
+  const list = $('notice-history');
+  if (!card || !list) return;
+
+  const rows = noticeHistory();
+  if (!rows.length) {
+    card.classList.add('hidden');
+    list.replaceChildren();
+    return;
+  }
+
+  list.replaceChildren(...rows.map((notice) => {
+    const row = document.createElement('button');
+    row.type = 'button';
+    row.className = 'notice-row';
+    row.addEventListener('click', () => openNoticeSheet(notice, false));
+
+    const title = document.createElement('span');
+    title.className = 'notice-row-title';
+    title.textContent = notice.title;
+    row.append(title);
+
+    if (notice.date) {
+      const when = document.createElement('span');
+      when.className = 'notice-row-date';
+      when.textContent = notice.date;
+      row.append(when);
+    }
+
+    return row;
+  }));
+  card.classList.remove('hidden');
 }
 
 async function loadNotice() {
@@ -1102,6 +1229,7 @@ async function loadNotice() {
     const feed = await res.json();
     notices = Array.isArray(feed && feed.notices) ? feed.notices : [];
     renderNotice();
+    renderNoticeHistory();
   } catch (_) {
     /* 没网、文件没发布、JSON 写错 —— 一律当作没有公告 */
   }
@@ -1144,8 +1272,16 @@ async function boot() {
         body: '水泵房例行检修,这段时间阀门可能没反应。洗完的记得早一点。',
         url: '',
         minVersion: '1.3.0',
+        date: '2026-10-20',
+      }, {
+        id: 'demo-old',
+        title: '周末水管检修通知',
+        body: '这一条是假的,只为让「历史公告」里有第二条可看。',
+        url: '',
+        date: '2026-10-12',
       }];
       renderNotice();
+      renderNoticeHistory();
     }
     return;
   }

@@ -124,6 +124,13 @@
       <button class="ghost wide danger" id="btn-logout">退出登录</button>
     </div>
 
+    <!-- 历史公告:顶上那一行点过「知道了」就没了,这里是那句话的存档。
+         没有公告时整块不出现(空区块会让人以为加载失败)。 -->
+    <div class="card hidden" id="card-notice-history">
+      <h2>历史公告</h2>
+      <div class="notice-history" id="notice-history"></div>
+    </div>
+
     <div class="card">
       <h2>诊断</h2>
       <p class="diag-hint">点一下开水的按钮，再回来复制这里的内容。</p>
@@ -204,6 +211,7 @@
 <div id="notice-sheet" class="sheet hidden" role="dialog" aria-modal="true" aria-labelledby="notice-heading">
   <div class="sheet-card">
     <h2 id="notice-heading"></h2>
+    <p class="notice-when hidden" id="notice-date"></p>
     <p id="notice-body"></p>
     <div class="sheet-actions">
       <a class="ghost hidden" id="notice-link" target="_blank" rel="noopener">打开链接</a>

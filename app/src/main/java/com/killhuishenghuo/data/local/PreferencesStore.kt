@@ -55,13 +55,16 @@ interface PreferencesStore {
     var noticeFeedJson: String?
 
     /**
-     * The id of the announcement the user already dismissed.
+     * The ids of the announcements the user already dismissed.
      *
-     * An id, not a boolean and not a timestamp: dismissing today's notice must not
-     * swallow tomorrow's. Unknown ids are ignored on read, so the file can be edited
-     * to publish a genuinely new notice to people who dismissed an old one.
+     * A set, not one id: the feed can carry two notices at once, and remembering only
+     * the last one makes them take turns — dismiss the newer one and the older one
+     * appears, dismiss that and the newer one comes back, with no state meaning "read
+     * both". Ids rather than a boolean or a timestamp for the older reason: dismissing
+     * today's notice must not swallow tomorrow's, and unknown ids are ignored on read,
+     * so the feed can always publish something new to everybody.
      */
-    var noticeDismissedId: String?
+    var noticeDismissedIds: Set<String>
 }
 
 /**

@@ -13,7 +13,7 @@
  *
  * 版本号仍然写在缓存名里 —— 它现在是给"旧缓存回收"用的,不再是更新的唯一开关。
  */
-const CACHE = 'huishui-shell-v5';
+const CACHE = 'huishui-shell-v6';
 
 const SHELL = [
   './',
