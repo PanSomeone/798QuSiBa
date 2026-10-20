@@ -23,7 +23,16 @@ object ApiConstants {
      */
     const val DEFAULT_BASE_URL = "https://i.ilife798.com/api/v1/"
 
-    /** Version the gateway is told about; `3.1.7` was in use in the captured traffic. */
+    /**
+     * Version the gateway is told about.
+     *
+     * Back to the honest value after a detour: `dev/start` started answering
+     * `{"code":-1,"msg":"请升级最新版APP"}`, and claiming 4.0.0 and then 4.5.0 changed
+     * nothing — because the gate is not about the version at all. It is attached to the
+     * device-scope route; see [applicationTypeFor]. The version is therefore reported as
+     * what the store actually ships (3.1.9, Xiaomi, 2026-09-22) rather than as a number
+     * invented to please a check that does not read it.
+     */
     const val APP_VERSION_NAME = "3.1.9"
 
     /** `VersionCode` request header. Same encoding the official app uses: `3.1.7` -> `31007`. */
@@ -80,14 +89,30 @@ object ApiConstants {
      * app is for and the failure modes are asymmetric: asking for the wrong
      * scope on a device call gets `code == -21` and no water, while this client
      * issues no account-service calls at all.
+     *
+     * ## 2026-10: opening and closing water moved to the account scope
+     *
+     * `dev/start` and `dev/end` now answer `{"code":-1,"msg":"请升级最新版APP"}` under
+     * the device scope (`1,1`) — for every client version, including the one the store
+     * still ships (3.1.9) and a much newer claim (4.5.0). Measured against a live
+     * session on 2026-10-20: the *same* two endpoints under the account scope (`1,5`)
+     * reach the business layer instead — a bogus device id answers 「请求参数错误」 and
+     * a real one answers 「设备运行中,请在设备上点击结算」. So the version gate is
+     * attached to the device-scope route, not to the endpoint or to the token.
+     *
+     * The captured clients' claim that `1,5` is refused on device calls with `-21` no
+     * longer holds on these two paths; `ui/app/master` and `dev/favo` accept either
+     * scope, so they stay on the scope they were verified with.
      */
     fun applicationTypeFor(path: String): String = when (path) {
         PATH_CAPTCHA, PATH_SMS_CODE, PATH_LOGIN -> APPLICATION_TYPE_LOGIN
+
+        // 开阀/关阀走账户作用域,理由见上:设备作用域被加了版本闸,而这条没有。
+        PATH_DEVICE_START, PATH_DEVICE_END -> APPLICATION_TYPE_ACCOUNT
+
         PATH_MASTER,
         PATH_DEVICE_STATUS,
         PATH_DEVICE_DETAIL,
-        PATH_DEVICE_START,
-        PATH_DEVICE_END,
         PATH_DEVICE_FAVO,
         PATH_QR_USE,
         -> APPLICATION_TYPE_DEVICE

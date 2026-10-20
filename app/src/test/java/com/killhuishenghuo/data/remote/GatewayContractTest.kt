@@ -116,10 +116,13 @@ class GatewayContractTest {
 
     private fun bodyText(request: RecordedRequest): String = requireNotNull(request.body).utf8()
 
-    private fun assertClientHeaders(request: RecordedRequest) {
+    private fun assertClientHeaders(
+        request: RecordedRequest,
+        applicationType: String = ApiConstants.APPLICATION_TYPE_DEVICE,
+    ) {
         assertEquals(ApiConstants.USER_AGENT, request.headers["user-agent"])
         assertEquals(ApiConstants.APP_VERSION_CODE, request.headers["VersionCode"])
-        assertEquals(ApiConstants.APPLICATION_TYPE_DEVICE, request.headers["ApplicationType"])
+        assertEquals(applicationType, request.headers["ApplicationType"])
     }
 
     // ---------------------------------------------------------------- paths
@@ -159,7 +162,9 @@ class GatewayContractTest {
             params(request),
         )
         assertTrue("args must be sent, even when empty", query(request).any { it.first == "args" })
-        assertClientHeaders(request)
+        // 开阀走**账户作用域** —— 设备作用域上加了一道「请升级最新版APP」的闸,
+        // 和客户端报的版本号无关;见 ApiConstants.applicationTypeFor。
+        assertClientHeaders(request, ApiConstants.APPLICATION_TYPE_ACCOUNT)
     }
 
     @Test
@@ -202,7 +207,8 @@ class GatewayContractTest {
         assertEquals("GET", request.method)
         assertEquals("/api/v1/dev/end", path(request))
         assertEquals(mapOf("did" to "D1", "rcp" to "false"), params(request))
-        assertClientHeaders(request)
+        // 同 start:关阀也必须走账户作用域。
+        assertClientHeaders(request, ApiConstants.APPLICATION_TYPE_ACCOUNT)
     }
 
     @Test
@@ -298,8 +304,11 @@ class GatewayContractTest {
         client.captcha(key = "KEY1234567")
 
         // Three different calls, including an unauthenticated one: the headers
-        // are the gateway's price of entry on all of them.
-        repeat(3) { assertClientHeaders(takeRequest()) }
+        // are the gateway's price of entry on all of them. Only the scope differs,
+        // and `dev/start` is the one that moved to the account scope.
+        assertClientHeaders(takeRequest())
+        assertClientHeaders(takeRequest(), ApiConstants.APPLICATION_TYPE_ACCOUNT)
+        assertClientHeaders(takeRequest())
     }
 
     @Test

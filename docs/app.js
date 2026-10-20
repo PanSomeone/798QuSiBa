@@ -32,7 +32,7 @@ const BASE = 'https://i.ilife798.com/api/v1/';
  * 它和下面的 `APP_VERSION` 是两件事:那个是这个网页端自己的版本,这个是"我假装
  * 自己是官方 App 的第几版"。
  */
-const VERSION_CODE = '40000';
+const VERSION_CODE = '31009';
 
 /**
  * 显示用的版本号,跟安卓端 `app/build.gradle.kts` 的 `versionName` **同步**。
@@ -40,7 +40,7 @@ const VERSION_CODE = '40000';
  * 两边各自记一个数字迟早会漂,所以 `tools/verify-v1.2.ps1` 里有一条检查:这两个值
  * 必须相等。改一处忘另一处会让校验脚本红,而不是让用户在设置里看到一个旧版本。
  */
-const APP_VERSION = '1.3.1';
+const APP_VERSION = '1.3.2';
 
 /** 网关的业务码。0 是成功,-99 是所有需鉴权接口共用的会话失效。 */
 const CODE_OK = 0;
@@ -158,11 +158,22 @@ function explain(result) {
 const master = () => api('ui/app/master');
 
 /** 开水。`args=` 必须**存在且为空** —— 淋浴器就是这样工作的,`cnt=1` 是一次扣费。 */
+/**
+ * 开阀 / 关阀走**账户作用域**（`ApplicationType: 1,5`），不是设备作用域。
+ *
+ * 2026-10 起，`1,1` 上这两个接口一律回 `{"code":-1,"msg":"请升级最新版APP"}` ——
+ * 和客户端报的版本无关（3.1.9、4.0.0、4.5.0 都一样）。实测同一份会话换成 `1,5`
+ * 就直接进业务层：不存在的设备号回「请求参数错误」，真设备回「设备运行中，请在设备上
+ * 点击结算」。安卓端 `ApiConstants.applicationTypeFor` 里是同一个结论。
+ */
 const startWater = (did) =>
-  api(`dev/start?did=${encodeURIComponent(did)}&upgrade=true&ptype=91&args=&rcp=false&cnt=1`);
+  api(`dev/start?did=${encodeURIComponent(did)}&upgrade=true&ptype=91&args=&rcp=false&cnt=1`, {
+    applicationType: '1,5',
+  });
 
-/** 关水。 */
-const endWater = (did) => api(`dev/end?did=${encodeURIComponent(did)}&rcp=false`);
+/** 关水。同上：账户作用域。 */
+const endWater = (did) =>
+  api(`dev/end?did=${encodeURIComponent(did)}&rcp=false`, { applicationType: '1,5' });
 
 /** 图形验证码的地址。用 <img> 直接显示:跨域图片不需要 CORS。 */
 function captchaUrl(key) {

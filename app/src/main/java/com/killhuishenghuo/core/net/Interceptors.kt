@@ -26,8 +26,14 @@ class ClientHeaderInterceptor : Interceptor {
 
     override fun intercept(chain: Interceptor.Chain): Response {
         val original = chain.request()
+        // `encodedPath` is the *whole* path — `/api/v1/dev/start` — while the table in
+        // `applicationTypeFor` is keyed by the endpoint as ApiConstants spells it,
+        // `dev/start`. Handing it the full path matched nothing and fell through to the
+        // `else` branch, which happened to return the device scope, so the mapping was
+        // quietly decorative until the day one endpoint needed a different scope.
+        val endpoint = original.url.encodedPath.substringAfter("/api/v1/", original.url.encodedPath)
         val applicationType = original.header(HEADER_APPLICATION_TYPE)
-            ?: ApiConstants.applicationTypeFor(original.url.encodedPath)
+            ?: ApiConstants.applicationTypeFor(endpoint.trimStart('/'))
 
         val request = original.newBuilder()
             .header("user-agent", USER_AGENT)
