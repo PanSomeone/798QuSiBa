@@ -17,7 +17,23 @@
 'use strict';
 
 const BASE = 'https://i.ilife798.com/api/v1/';
-const VERSION_CODE = '31009';
+
+/**
+ * 发给网关的客户端版本号(`VersionCode` 头)。
+ *
+ * 编码方式是 `主版本 * 10000 + 次版本 * 1000 + 补丁`:官方安卓版 3.1.9 → `31009`。
+ *
+ * **网关会拒掉它认为过旧的客户端**,回一句「请升级至最新版APP」。而那道校验排在
+ * 鉴权**之后** —— 用假 token 探所有接口都只会得到「登录状态已过期」,所以在没有
+ * 真会话的情况下只能靠往上调。这里给到 4.0.0 的地板值:如果服务端比的是
+ * 「不小于某个版本」,它就能过;如果比的是精确相等,那客户端怎么改都没用,只能等
+ * 服务端放宽。
+ *
+ * 它和下面的 `APP_VERSION` 是两件事:那个是这个网页端自己的版本,这个是"我假装
+ * 自己是官方 App 的第几版"。
+ */
+const VERSION_CODE = '40000';
+
 /**
  * 显示用的版本号,跟安卓端 `app/build.gradle.kts` 的 `versionName` **同步**。
  *
@@ -107,9 +123,22 @@ async function api(path, { method = 'GET', body = null, token, applicationType =
   if (!parsed) {
     return { code: null, msg: `HTTP ${response.status}：服务器没有返回 JSON`, data: null, http: response.status };
   }
+
+  const code = parsed.code === undefined ? null : parsed.code;
+  const message = parsed.msg || parsed.message || '';
+
+  // 失败时把「哪个调用、什么码、服务器原话」写进控制台。
+  //
+  // 这一行是为了修一类难查的故障:网关卡在版本或环境上时,页面上只会显示它那句话,
+  // 而"是哪一次调用被拒的"没地方看 —— 于是报告变成"它说请升级",谁也定位不了。
+  // 打开 DevTools 的控制台就能看到完整的一条。
+  if (code !== null && code !== CODE_OK) {
+    console.warn(`[api] ${method} ${path} -> code=${code} msg=${message || '(empty)'}`);
+  }
+
   return {
-    code: parsed.code === undefined ? null : parsed.code,
-    msg: parsed.msg || parsed.message || '',
+    code,
+    msg: message,
     data: parsed.data === undefined ? null : parsed.data,
     http: response.status,
   };
