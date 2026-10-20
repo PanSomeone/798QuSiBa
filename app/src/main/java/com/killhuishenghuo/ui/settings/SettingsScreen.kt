@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -29,12 +30,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.DevicesOther
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Logout
@@ -52,6 +55,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.TextFieldColors
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -77,6 +81,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -136,6 +141,10 @@ fun SettingsScreen(
     val context = LocalContext.current
     var feedback by remember { mutableStateOf("") }
     var copied by remember { mutableStateOf(false) }
+
+    // 收款码是弹出来的,不是铺在设置里的:它是"这一行点进去才需要看"的东西,
+    // 常驻会把整页撑长,而且抢了上面那些真正每天要用的行。
+    var showSponsor by remember { mutableStateOf(false) }
 
     // A scope tied to this screen rather than to a ViewModel: the work is a file
     // write on behalf of one press, and it should be dropped if the screen goes
@@ -322,30 +331,75 @@ fun SettingsScreen(
                     )
                 }
 
-                // 赞助放在最底下:它是"用着顺手再说"的东西,不是入口。
-                // 两张收款码并排,比例按原图(支付宝高一些)。不弹窗、不拦路 ——
-                // 想给的人自己扫,不想给的人划过去就没了。
+                // 赞助:和「检查更新」同一种入口 —— 一行,点开才弹收款码。
+                // 仍然放在最底下:它是"用着顺手再说"的东西,不是入口。
                 Section(title = "赞助") {
-                    // Section 只负责标题的缩进,内容要自己带内边距 —— 否则图片会顶到
-                    // 屏幕边缘,和上面每一行的左边界对不齐。
-                    Column(modifier = Modifier.padding(horizontal = Spacing.lg)) {
+                    SettingRow(
+                        icon = Icons.Filled.Favorite,
+                        label = "请我喝一杯咖啡",
+                        detail = "觉得好用的请我喝一杯咖啡吧 🌟",
+                        trailing = {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                contentDescription = null,
+                                tint = colors.inkFaint,
+                                modifier = Modifier.size(16.dp),
+                            )
+                        },
+                        onClick = { showSponsor = true },
+                    )
+                }
+            }
+        }
+
+        // 收款码弹窗。用 Dialog 而不是 AlertDialog:后者的宽度被压到 ~280dp,
+        // 两张码并排只剩一百来 dp —— 另一个手机未必扫得出来。
+        if (showSponsor) {
+            Dialog(onDismissRequest = { showSponsor = false }) {
+                Surface(
+                    shape = RoundedCornerShape(Radii.card),
+                    color = colors.surfaceRaised,
+                ) {
+                    Column(modifier = Modifier.padding(Spacing.md)) {
                         Text(
-                            text = "觉得好用的请我喝一杯咖啡吧 🌟",
-                            style = MaterialTheme.typography.bodyMedium,
+                            text = "请我喝一杯咖啡 🌟",
+                            style = MaterialTheme.typography.titleMedium,
                             color = colors.ink,
-                            modifier = Modifier.padding(bottom = Spacing.sm),
                         )
+                        Spacer(Modifier.height(Spacing.xs))
+                        Text(
+                            // 一个人只有一台手机时,屏幕上的码自己扫不到 —— 所以这张图
+                            // 必须能存下来,再去另一台设备(或网页端的「从相册选择」)读。
+                            text = "支付宝或微信扫一扫 · 点图片可保存",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = colors.inkMuted,
+                        )
+                        Spacer(Modifier.height(Spacing.md))
                         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                             SponsorCode(
                                 image = R.drawable.sponsor_alipay,
                                 caption = "支付宝",
                                 aspect = 0.666f,
+                                onSave = {
+                                    Toast.makeText(
+                                        context,
+                                        SponsorSave.save(context, R.drawable.sponsor_alipay, "支付宝收款码.jpg"),
+                                        Toast.LENGTH_SHORT,
+                                    ).show()
+                                },
                                 modifier = Modifier.weight(1f),
                             )
                             SponsorCode(
                                 image = R.drawable.sponsor_wechat,
                                 caption = "微信",
                                 aspect = 0.734f,
+                                onSave = {
+                                    Toast.makeText(
+                                        context,
+                                        SponsorSave.save(context, R.drawable.sponsor_wechat, "微信收款码.jpg"),
+                                        Toast.LENGTH_SHORT,
+                                    ).show()
+                                },
                                 modifier = Modifier.weight(1f),
                             )
                         }
@@ -367,18 +421,20 @@ private fun SponsorCode(
     image: Int,
     caption: String,
     aspect: Float,
+    onSave: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         Image(
             painter = painterResource(image),
-            contentDescription = caption + "收款码",
+            contentDescription = caption + "收款码，点一下保存",
             contentScale = ContentScale.Fit,
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(aspect)
                 .clip(RoundedCornerShape(Radii.card))
-                .background(Color.White),
+                .background(Color.White)
+                .clickable(onClick = onSave),
         )
         Spacer(Modifier.height(Spacing.xxs))
         Text(

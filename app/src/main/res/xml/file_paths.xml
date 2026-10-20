@@ -1,11 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    One entry, for the exported log only. `cache-path` rather than `files-path`:
-    the log is a debugging artefact, and a cache directory is the one place the
-    system is allowed to reclaim when the phone runs out of room.
+    Two entries, both under the cache because both are throwaway copies of something
+    the app can regenerate.
+
+    `logs/` for the exported log: a debugging artefact, and the cache is the one place
+    the system is allowed to reclaim when the phone runs out of room.
+
+    `share/` for a payment code handed to the share sheet on Android 9 and below, where
+    writing to the gallery would need a storage permission this app does not ask for.
 -->
 <paths>
     <cache-path
         name="logs"
         path="logs/" />
+    <cache-path
+        name="share"
+        path="share/" />
 </paths>
