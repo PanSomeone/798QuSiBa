@@ -33,10 +33,22 @@ class SharedPreferencesPreferencesStore(context: Context) : PreferencesStore {
             if (value.isNullOrBlank()) remove(KEY_DEVICE) else putString(KEY_DEVICE, value)
         }
 
+    override var noticeFeedJson: String?
+        get() = prefs.getString(KEY_NOTICE_FEED, null)
+        set(value) = prefs.edit { putString(KEY_NOTICE_FEED, value) }
+
+    override var noticeDismissedId: String?
+        get() = prefs.getString(KEY_NOTICE_DISMISSED, null)?.takeIf { it.isNotBlank() }
+        set(value) = prefs.edit {
+            if (value.isNullOrBlank()) remove(KEY_NOTICE_DISMISSED) else putString(KEY_NOTICE_DISMISSED, value)
+        }
+
     private companion object {
         const val PREFS_NAME = "kill_huishenghuo_prefs"
         const val KEY_THEME = "theme_mode"
         const val KEY_ONBOARDED = "onboarding_done"
         const val KEY_DEVICE = "selected_device_id"
+        const val KEY_NOTICE_FEED = "notice_feed_json"
+        const val KEY_NOTICE_DISMISSED = "notice_dismissed_id"
     }
 }

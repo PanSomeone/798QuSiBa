@@ -114,6 +114,47 @@ function loadFrame(src, waitMs) {
     record('sms probe ran', false, e.message);
   }
 
+  // ---- the notice row ----
+  // `?demo=1&notice=1` plants a fake notice, so this needs no network and no editing
+  // of notice.json. What is being checked is the promise: the row only exists when
+  // there is something to say, dismissing it hides it AND is remembered.
+  localStorage.removeItem('huishui.notice');
+  const noticed = await loadFrame('index.html?demo=1&notice=1', 1200);
+  try {
+    const doc = noticed.contentDocument;
+    const pill = doc.getElementById('notice-pill');
+    record('the notice row appears when there is a notice',
+      Boolean(pill) && !pill.classList.contains('hidden'));
+    record('the notice row carries a title',
+      (((doc.getElementById('notice-title') || {}).textContent) || '').length > 0);
+    // Geometry, not a screenshot: an earlier version of the big button overflowed the
+    // right edge and a screenshot looked almost right. The number does not lie.
+    const edge = pill.getBoundingClientRect();
+    record('the notice row fits inside the page',
+      edge.width > 0 && edge.left >= 0 && edge.right <= doc.documentElement.clientWidth + 1,
+      'left=' + Math.round(edge.left) + ' right=' + Math.round(edge.right) +
+      ' page=' + doc.documentElement.clientWidth);
+    pill.click();
+    record('the notice opens its full text',
+      !doc.getElementById('notice-sheet').classList.contains('hidden'));
+    doc.getElementById('notice-ok').click();
+    record('dismissing hides the row', pill.classList.contains('hidden'));
+    record('dismissing records the id', (localStorage.getItem('huishui.notice') || '') === 'demo');
+  } catch (e) {
+    record('notice frame readable', false, e.message);
+  }
+
+  const again = await loadFrame('index.html?demo=1&notice=1', 900);
+  try {
+    record('a dismissed notice stays dismissed',
+      again.contentDocument.getElementById('notice-pill').classList.contains('hidden'));
+  } catch (e) {
+    record('notice reload readable', false, e.message);
+  }
+  again.remove();
+  noticed.remove();
+  localStorage.removeItem('huishui.notice');
+
   flush();
   // The verdict goes in the title, not in the body: this page's own source contains
   // the strings 'PASS ' and 'FAIL ', so grepping the dumped document for them also

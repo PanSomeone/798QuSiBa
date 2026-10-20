@@ -33,6 +33,13 @@
       <p class="pun">798 748</p>
     </header>
 
+    <!-- 公告:一行,只在真有公告时出现。点开是弹层,不把按钮往下挤。 -->
+    <button class="notice hidden" id="notice-pill" type="button">
+      <span class="notice-dot" aria-hidden="true"></span>
+      <span class="notice-title" id="notice-title"></span>
+      <span class="notice-more">查看</span>
+    </button>
+
     <div class="action">
       <div class="chip" id="device-chip">
         <span class="dot"></span><span id="device-name">还没登录</span>
@@ -183,6 +190,19 @@
   </div>
   <input id="scan-file" type="file" accept="image/*" hidden>
   <p class="status" id="scan-status"></p>
+</div>
+
+<!-- 公告全文。和取景框一样整块盖上,但只有那一行能打开它。
+     点卡片外面也关 —— 弹层不是目的地,关掉它不需要找按钮。 -->
+<div id="notice-sheet" class="sheet hidden" role="dialog" aria-modal="true" aria-labelledby="notice-heading">
+  <div class="sheet-card">
+    <h2 id="notice-heading"></h2>
+    <p id="notice-body"></p>
+    <div class="sheet-actions">
+      <a class="ghost hidden" id="notice-link" target="_blank" rel="noopener">打开链接</a>
+      <button class="btn" id="notice-ok" type="button">知道了</button>
+    </div>
+  </div>
 </div>
 
 <script src="deviceqr.js"></script>

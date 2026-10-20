@@ -444,6 +444,81 @@ code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; c
 /* 选中态只留颜色:背景交给那层会滑的块,两者都有就成了两层高亮。 */
 .tabitem.on { color: #7fd3f5; background: transparent; box-shadow: none; }
 
+/* ---------------- 公告 ---------------- */
+
+/* 一行,水蓝色的点,右端「查看」。
+ * 它和主按钮的关系是"谁都不挡谁":公告只有一行,主按钮还在原位 —— 一条公告不该
+ * 让一个每天要用两次的动作多滚一步。 */
+.notice {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  margin: 0 0 4px;
+  padding: 11px 14px;
+  border: 1px solid var(--glass-edge);
+  border-radius: 15px;
+  background: var(--glass);
+  color: var(--ink);
+  font-size: 13.5px;
+  text-align: left;
+  cursor: pointer;
+}
+.notice:active { transform: translateY(1px); }
+.notice-dot {
+  flex: none;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--water);
+  box-shadow: 0 0 10px rgba(76,194,241,.7);
+}
+.notice-title {
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.notice-more { flex: none; font-size: 12.5px; color: var(--water); }
+/* 这两条必须写在 .notice / .sheet 之后:.hidden 只有一层类名,和它们同级,
+ * 后写的赢 —— 否则 display:flex 会把 display:none 覆盖掉,公告和弹层就永远关不上。 */
+.notice.hidden { display: none; }
+.sheet.hidden { display: none; }
+
+/* 弹层。和取景框同一层 z-index 之上一点:公告可能是在取景框关掉之后才被点开的。 */
+.sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 20px;
+  padding-bottom: calc(20px + env(safe-area-inset-bottom));
+  background: rgba(4, 7, 12, .62);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+.sheet-card {
+  width: 100%;
+  max-width: 420px;
+  margin-bottom: var(--tabbar-h);
+  padding: 20px 18px 16px;
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--radius);
+  background: var(--raised);
+}
+.sheet-card h2 { margin: 0 0 10px; font-size: 17px; font-weight: 600; color: var(--ink); }
+.sheet-card p { margin: 0; font-size: 14px; line-height: 1.75; color: var(--ink-muted); white-space: pre-wrap; }
+.sheet-card p:empty { display: none; }
+.sheet-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+}
+.sheet-actions .btn { margin-left: auto; width: auto; padding: 10px 22px; }
+.sheet-actions .ghost { width: auto; }
+
 @media (display-mode: standalone) {
   /* 装到主屏幕之后,浏览器 chrome 没了,顶部可以收一点 */
   body { padding-top: max(10px, env(safe-area-inset-top)); }

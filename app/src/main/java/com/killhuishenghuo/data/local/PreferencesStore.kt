@@ -41,6 +41,27 @@ interface PreferencesStore {
      * and with several it has to ask.
      */
     var selectedDeviceId: String?
+
+    /**
+     * The last announcement feed that parsed, kept as the raw JSON.
+     *
+     * Raw rather than parsed because parsing belongs to whoever reads it, and because
+     * a future field must not require a migration just to keep showing an old notice.
+     * The reason to keep it at all: the announcement is fetched from a static file, and
+     * a launch with no network should still show what the server said last time instead
+     * of going silent — silence looks like "there is no announcement", which would be a
+     * different statement from "we could not check".
+     */
+    var noticeFeedJson: String?
+
+    /**
+     * The id of the announcement the user already dismissed.
+     *
+     * An id, not a boolean and not a timestamp: dismissing today's notice must not
+     * swallow tomorrow's. Unknown ids are ignored on read, so the file can be edited
+     * to publish a genuinely new notice to people who dismissed an old one.
+     */
+    var noticeDismissedId: String?
 }
 
 /**

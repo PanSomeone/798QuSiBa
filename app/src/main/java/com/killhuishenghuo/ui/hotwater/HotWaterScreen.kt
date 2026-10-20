@@ -43,6 +43,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.killhuishenghuo.data.notice.Notice
+import com.killhuishenghuo.ui.components.NoticeBanner
 import com.killhuishenghuo.ui.components.WaterAmbienceBox
 import com.killhuishenghuo.ui.components.glassTabBarSpace
 import com.killhuishenghuo.ui.theme.Radii
@@ -77,6 +79,8 @@ fun HotWaterScreen(
     onOpenSettings: () -> Unit,
     buttonBounds: Rect,
     onButtonBounds: (Rect) -> Unit,
+    notice: Notice?,
+    onDismissNotice: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -92,6 +96,8 @@ fun HotWaterScreen(
         state = state,
         buttonBounds = buttonBounds,
         onButtonBounds = onButtonBounds,
+        notice = notice,
+        onDismissNotice = onDismissNotice,
         onPrimaryAction = {
             // The button never lies about what it will do. When there is nothing
             // to switch — no session, or an account with no devices on it — its
@@ -121,6 +127,8 @@ fun HotWaterContent(
     state: HotWaterUiState,
     buttonBounds: Rect = Rect.Zero,
     onButtonBounds: (Rect) -> Unit = {},
+    notice: Notice? = null,
+    onDismissNotice: (String) -> Unit = {},
     onPrimaryAction: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -151,6 +159,16 @@ fun HotWaterContent(
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     AppWordmark()
+
+                    // 公告贴在字标下面、按钮上面。
+                    //
+                    // 位置是它唯一的自由度:再往上就是屏幕最边缘,再往下就要挤按钮。
+                    // 它只有一行、而且绝大多数时候不存在,所以放在这里既不会让每次
+                    // 打水都看见,也不会在真的有话说时藏起来。
+                    if (notice != null) {
+                        Spacer(Modifier.height(Spacing.md))
+                        NoticeBanner(notice = notice, onDismiss = onDismissNotice)
+                    }
 
                     Spacer(Modifier.weight(BottomBias))
 

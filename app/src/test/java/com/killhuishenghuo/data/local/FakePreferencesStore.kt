@@ -15,4 +15,6 @@ class FakePreferencesStore(
     override var themeMode: ThemeMode = ThemeMode.DARK,
     override var onboardingDone: Boolean = false,
     override var selectedDeviceId: String? = null,
+    override var noticeFeedJson: String? = null,
+    override var noticeDismissedId: String? = null,
 ) : PreferencesStore

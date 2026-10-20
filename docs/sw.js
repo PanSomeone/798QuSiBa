@@ -13,7 +13,7 @@
  *
  * 版本号仍然写在缓存名里 —— 它现在是给"旧缓存回收"用的,不再是更新的唯一开关。
  */
-const CACHE = 'huishui-shell-v3';
+const CACHE = 'huishui-shell-v4';
 
 const SHELL = [
   './',
@@ -78,6 +78,13 @@ self.addEventListener('fetch', (event) => {
         })
         .catch(() => caches.match(event.request).then((hit) => hit || caches.match('index.html'))),
     );
+    return;
+  }
+
+  // 公告是把"改一行字就发出去"当设计目标的东西,所以它不能先缓存:否则发一条
+  // 公告还得同时改缓存名。它也不是离线必需品 —— 读不到就少一行。
+  if (url.pathname.endsWith('.json')) {
+    event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
     return;
   }
 

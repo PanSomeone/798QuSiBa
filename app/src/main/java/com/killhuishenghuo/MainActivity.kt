@@ -39,6 +39,7 @@ import com.killhuishenghuo.core.log.AppLog
 import com.killhuishenghuo.core.net.NetworkModule
 import com.killhuishenghuo.data.local.ThemeMode
 import com.killhuishenghuo.data.model.Device
+import com.killhuishenghuo.data.notice.NoticeRepository
 import com.killhuishenghuo.data.update.UpdateChecker
 import com.killhuishenghuo.ui.components.GlassScrim
 import com.killhuishenghuo.ui.components.GlassTabBar
@@ -52,6 +53,7 @@ import com.killhuishenghuo.ui.hotwater.HotWaterViewModel
 import com.killhuishenghuo.ui.hotwater.HotWaterViewModelFactory
 import com.killhuishenghuo.ui.login.AuthViewModel
 import com.killhuishenghuo.ui.login.AuthViewModelFactory
+import com.killhuishenghuo.ui.notice.NoticeViewModel
 import com.killhuishenghuo.ui.settings.SettingsScreen
 import com.killhuishenghuo.ui.settings.UpdateUiState
 import com.killhuishenghuo.ui.settings.UpdateViewModel
@@ -253,6 +255,19 @@ private fun AppRoot() {
             val updateState by updateViewModel.state.collectAsStateWithLifecycle()
             LaunchedEffect(Unit) { updateViewModel.check() }
 
+            // 公告。和检查更新放在同一层,理由也一样:主屏要画,而"看见了没有"必须
+            // 只有一份状态。它读的是 GitHub Pages 上的静态文件,所以不受 api.github.com
+            // 那个每小时 60 次的额度影响 —— 检查更新已经被 403 挡过一次了。
+            val noticeViewModel: NoticeViewModel = viewModel(key = "notice") {
+                NoticeViewModel(
+                    repository = NoticeRepository(),
+                    preferences = app.preferences,
+                    versionName = BuildConfig.VERSION_NAME,
+                )
+            }
+            val notice by noticeViewModel.notice.collectAsStateWithLifecycle()
+            LaunchedEffect(Unit) { noticeViewModel.load() }
+
             // A stale session is the one thing that gets its own screen.
             if (sessionExpired) {
                 StartHost(
@@ -268,6 +283,8 @@ private fun AppRoot() {
                     onOpenSettings = { destination = Destination.SETTINGS },
                     buttonBounds = buttonBounds,
                     onButtonBounds = { buttonBounds = it },
+                    notice = notice,
+                    onDismissNotice = noticeViewModel::dismiss,
                 )
 
                 Destination.SETTINGS -> SettingsHost(

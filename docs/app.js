@@ -42,7 +42,7 @@ const VERSION_CODE = new URLSearchParams(location.search).get("vc") || "31009";
  * 两边各自记一个数字迟早会漂,所以 `tools/verify-v1.2.ps1` 里有一条检查:这两个值
  * 必须相等。改一处忘另一处会让校验脚本红,而不是让用户在设置里看到一个旧版本。
  */
-const APP_VERSION = '1.3.3';
+const APP_VERSION = '1.3.4';
 
 /** 网关的业务码。0 是成功,-99 是所有需鉴权接口共用的会话失效。 */
 const CODE_OK = 0;
@@ -940,8 +940,117 @@ function bind() {
 
   renderDiag();
 
+  // 公告那一行:点开看全文,点「知道了」就不再出现。
+  $('notice-pill').onclick = openNotice;
+  $('notice-ok').onclick = dismissNotice;
+  // 点卡片外面也关:弹层不是目的地,关掉它不该需要找按钮。
+  $('notice-sheet').onclick = (event) => {
+    if (event.target === $('notice-sheet')) closeNotice();
+  };
+
   // 默认那页是短信登录,而它的图形验证码要自己拉一张 —— 否则用户看到的是一个空框。
   refreshCaptcha();
+}
+
+/* ------------------------------------------------------------------ 公告 */
+
+/**
+ * 公告读的是仓库里的 `notice.json`,和安卓端**同一个文件**。
+ *
+ * 走 GitHub Pages 而不是 `api.github.com`,理由和安卓端一样:那条线路的未鉴权额度
+ * 是每小时 60 次、按出口 IP 算,宿舍一栋楼常常共用一两个 IP —— 检查更新已经因为 403
+ * 失败过一次,公告不该再踩一遍。静态文件没有额度。
+ *
+ * 读不到就当没有公告:一条读不出来的公告不该变成一个弹窗。
+ */
+const NOTICE_URL = 'notice.json';
+const NOTICE_KEY = 'huishui.notice'; /* 已经点过「知道了」的那条 id */
+
+let notices = [];       /* 最近一次读到的 feed */
+let shownNotice = null; /* 屏幕上正在说的那条 */
+
+/** 版本号比大小。读不出来按 0 处理,和安卓端 `Version.compare` 的宽松程度一致。 */
+function compareVersion(a, b) {
+  const pa = String(a).match(/\d+/g) || [];
+  const pb = String(b).match(/\d+/g) || [];
+  for (let i = 0; i < Math.max(pa.length, pb.length); i += 1) {
+    const x = Number(pa[i] || 0);
+    const y = Number(pb[i] || 0);
+    if (x !== y) return x < y ? -1 : 1;
+  }
+  return 0;
+}
+
+/**
+ * 哪条该显示。
+ *
+ * 和安卓端 `NoticeRules.visible` 是同一套规则:id/title 非空、点过「知道了」的跳过、
+ * 过期的不显示、`minVersion` 高于当前版本的不显示(旧版看不懂也做不到)。两端说法
+ * 必须一致,否则同一份 notice.json 会在手机上出现、在浏览器里不出现。
+ */
+function pickNotice() {
+  const dismissed = localStorage.getItem(NOTICE_KEY) || '';
+  const today = new Date().toISOString().slice(0, 10);
+  for (const n of notices) {
+    if (!n || !n.id || !n.title) continue;
+    if (n.id === dismissed) continue;
+    /* ISO 日期字符串的字典序就是时间序 */
+    if (n.until && today > n.until) continue;
+    if (n.minVersion && compareVersion(APP_VERSION, n.minVersion) < 0) continue;
+    return n;
+  }
+  return null;
+}
+
+/** 把「该不该有那一行」画出来。没有公告就整行不占位置。 */
+function renderNotice() {
+  shownNotice = pickNotice();
+  const pill = $('notice-pill');
+  if (!pill) return;
+  if (!shownNotice) {
+    pill.classList.add('hidden');
+    return;
+  }
+  $('notice-title').textContent = shownNotice.title;
+  pill.classList.remove('hidden');
+}
+
+function openNotice() {
+  if (!shownNotice) return;
+  $('notice-heading').textContent = shownNotice.title;
+  $('notice-body').textContent = shownNotice.body || '';
+  const link = $('notice-link');
+  if (shownNotice.url) {
+    link.href = shownNotice.url;
+    link.classList.remove('hidden');
+  } else {
+    link.removeAttribute('href');
+    link.classList.add('hidden');
+  }
+  $('notice-sheet').classList.remove('hidden');
+}
+
+function closeNotice() {
+  $('notice-sheet').classList.add('hidden');
+}
+
+/** 点过「知道了」只记 id:否则点一次之后,以后发什么都看不见了。 */
+function dismissNotice() {
+  if (shownNotice) localStorage.setItem(NOTICE_KEY, shownNotice.id);
+  closeNotice();
+  renderNotice();
+}
+
+async function loadNotice() {
+  try {
+    const res = await fetch(NOTICE_URL, { cache: 'no-store' });
+    if (!res.ok) return;
+    const feed = await res.json();
+    notices = Array.isArray(feed && feed.notices) ? feed.notices : [];
+    renderNotice();
+  } catch (_) {
+    /* 没网、文件没发布、JSON 写错 —— 一律当作没有公告 */
+  }
 }
 
 /* ------------------------------------------------------------------ 启动 */
@@ -971,6 +1080,19 @@ async function boot() {
     }
     renderMain();
     renderDevice(); renderSettings();
+
+    // 公告也能用假的看一眼:`?demo=1&notice=1`。演示里不发请求,理由同上 ——
+    // 想看一眼排版的人不该为此碰网络。
+    if (params.has('notice')) {
+      notices = [{
+        id: 'demo',
+        title: '今晚 22:00–23:00 停水检修',
+        body: '水泵房例行检修,这段时间阀门可能没反应。洗完的记得早一点。',
+        url: '',
+        minVersion: '1.3.0',
+      }];
+      renderNotice();
+    }
     return;
   }
 
@@ -986,6 +1108,9 @@ async function boot() {
   renderMain();
   renderDevice();
   renderSettings();
+
+  // 公告不等它:那一行出现得晚一点无所谓,而"等一个静态文件"不该拖住主界面。
+  loadNotice();
 
   if (!store.token) return;
 
