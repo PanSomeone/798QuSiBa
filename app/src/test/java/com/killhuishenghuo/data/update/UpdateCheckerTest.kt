@@ -18,6 +18,10 @@ import java.util.concurrent.TimeUnit
  * The point of using MockWebServer rather than a fake is the header assertion
  * below: what this test is really about is **what this request must not carry**,
  * and only a real request can answer that.
+ *
+ * Every URL the checker knows is pinned to this server, including the mirror —
+ * an unpinned mirror would make a test that exercises the 403 road quietly ask
+ * gitee.com how fast its download is today.
  */
 class UpdateCheckerTest {
 
@@ -41,9 +45,12 @@ class UpdateCheckerTest {
      */
     private fun checker(): UpdateChecker = UpdateChecker(
         endpoint = server.url("/releases").toString(),
-        // Never the real github.com. If the fallback is not pinned here, a test
-        // that walks the 403 road would quietly ask the internet.
+        // Never the real github.com / gitee.com. If these are not pinned here, a
+        // test that walks the fallback roads would quietly ask the internet.
         fallbackEndpoint = server.url("/releases.atom").toString(),
+        mirrorEndpoint = server.url("/mirror").toString(),
+        mirrorDownload = server.url("/gitee/download").toString(),
+        mirrorPage = server.url("/gitee/tag/").toString(),
     )
 
     private fun enqueueJson(body: String, code: Int = 200) {
@@ -86,6 +93,16 @@ class UpdateCheckerTest {
         url: String = "https://github.com/PanSomeone/798QuSiBa/releases/tag/$tag",
     ) = """{"tag_name":"$tag","html_url":"$url","draft":$draft,"assets":[$assets]}"""
 
+    /** A release exactly as Gitee's API describes it: no `html_url`, no `draft`. */
+    private fun mirrorRelease(tag: String, withApk: Boolean = true): String {
+        val asset = if (withApk) {
+            """{"name": "huishui-$tag-fast.apk", "browser_download_url": "${server.url("/gitee/download/$tag/huishui-$tag-fast.apk")}"}"""
+        } else {
+            ""
+        }
+        return """{"tag_name":"$tag","name":"release $tag","prerelease":true,"assets":[$asset]}"""
+    }
+
     @Test
     fun `the update request carries no authorization header`() = runBlocking {
         // The gateway's client attaches the session token to every request it can
@@ -94,6 +111,7 @@ class UpdateCheckerTest {
         // The checker therefore builds its own client -- and this is the assertion
         // that keeps it that way.
         enqueueJson("[${release("v1.2.4")}]")
+        enqueueStatus(404) // the mirror has not been stocked with this tag
 
         checker().newest()
 
@@ -108,6 +126,7 @@ class UpdateCheckerTest {
         // GitHub returns newest-first by time, which is not the same as newest by
         // version when a hotfix is tagged after a major release.
         enqueueJson("[${release("v1.2.9")}, ${release("v1.2.10")}, ${release("v1.3.0")}]")
+        enqueueStatus(404)
 
         val info = checker().newest().getOrNull()
 
@@ -117,6 +136,7 @@ class UpdateCheckerTest {
     @Test
     fun `a draft is not a release anybody can download`() = runBlocking {
         enqueueJson("[${release("v1.4.0", draft = true)}, ${release("v1.2.4")}]")
+        enqueueStatus(404)
 
         assertEquals("v1.2.4", checker().newest().getOrNull()?.tag)
     }
@@ -124,6 +144,7 @@ class UpdateCheckerTest {
     @Test
     fun `the apk asset is picked out of the release`() = runBlocking {
         enqueueJson("[${release("v1.2.4")}]")
+        enqueueStatus(404) // no mirror copy, so the release's own asset is used
 
         val info = checker().newest().getOrNull()
 
@@ -132,10 +153,26 @@ class UpdateCheckerTest {
     }
 
     @Test
+    fun `the mirror's copy is preferred when the mirror has it`() = runBlocking {
+        // The tag is the only thing needed: the file name is this project's own
+        // convention. The HEAD is what turns that guess into a download button.
+        enqueueJson("[${release("v1.2.4")}]")
+        enqueueStatus(200)
+
+        val info = checker().newest().getOrNull()
+
+        assertEquals(
+            server.url("/gitee/download/v1.2.4/huishui-1.2.4-fast.apk").toString(),
+            info?.apkUrl,
+        )
+    }
+
+    @Test
     fun `a release with no apk attached is still an answer`() = runBlocking {
         // Notes-only tags are legitimate, and the row falls back to the release
         // page rather than claiming there is nothing to install.
         enqueueJson("[${release("v1.2.4", assets = "")}]")
+        enqueueStatus(404) // the mirror has nothing for it either
 
         val info = checker().newest().getOrNull()
 
@@ -147,7 +184,8 @@ class UpdateCheckerTest {
     @Test
     fun `a failing server is a failure, not an empty list`() = runBlocking {
         enqueueJson("""{"message":"rate limited"}""", code = 403)
-        enqueueStatus(500) // the fallback road is down too
+        enqueueStatus(500) // the mirror is down too
+        enqueueStatus(500) // and so is the feed
 
         val outcome = checker().newest()
 
@@ -160,7 +198,9 @@ class UpdateCheckerTest {
         // exit IP. github.com serves releases.atom off a different budget, so the
         // second road exists exactly for the moment the first one says 403.
         enqueueJson("""{"message":"API rate limit exceeded"}""", code = 403)
+        enqueueStatus(500) // the mirror answers nothing useful
         enqueueAtom("v1.3.2", "v1.3.3")
+        enqueueStatus(404) // no mirror copy of v1.3.3
         enqueueStatus(200) // HEAD on the constructed asset URL
 
         val info = checker().newest().getOrNull()
@@ -179,7 +219,9 @@ class UpdateCheckerTest {
         // release tagged yesterday, and the fallback must not answer with the wrong
         // one just because it arrived first.
         enqueueJson("""{"message":"API rate limit exceeded"}""", code = 403)
+        enqueueStatus(500)
         enqueueAtom("v1.2.9", "v1.2.10", "v1.3.0")
+        enqueueStatus(404)
         enqueueStatus(200)
 
         assertEquals("v1.3.0", checker().newest().getOrNull()?.tag)
@@ -190,8 +232,10 @@ class UpdateCheckerTest {
         // The asset URL is a guess at a naming convention. A 404 on it must not turn
         // into a download button that downloads nothing.
         enqueueJson("""{"message":"API rate limit exceeded"}""", code = 403)
+        enqueueStatus(500)
         enqueueAtom("v1.3.3")
-        enqueueStatus(404)
+        enqueueStatus(404) // mirror
+        enqueueStatus(404) // github
 
         val info = checker().newest().getOrNull()
 
@@ -203,6 +247,7 @@ class UpdateCheckerTest {
     @Test
     fun `a feed that is not a feed keeps the rate limit sentence`() = runBlocking {
         enqueueJson("""{"message":"API rate limit exceeded"}""", code = 403)
+        enqueueStatus(500)
         server.enqueue(
             MockResponse.Builder().code(200).body("<html>not a feed</html>").build(),
         )
@@ -221,9 +266,10 @@ class UpdateCheckerTest {
         // IP has spent its 60 per hour" -- and a dorm shares one exit IP. The generic
         // "server refused (code 403)" gives somebody standing in a bathroom nothing to
         // do next, so the sentence has to name GitHub and say it is temporary. It is
-        // still the answer when the second road is also blocked.
+        // still the answer when every other road is blocked too.
         enqueueJson("""{"message":"API rate limit exceeded"}""", code = 403)
-        enqueueStatus(403)
+        enqueueStatus(500) // mirror
+        enqueueStatus(403) // feed
 
         val outcome = checker().newest()
 
@@ -239,6 +285,7 @@ class UpdateCheckerTest {
         // Guard against the fix above swallowing everything: a 500 is not a rate limit
         // and must not be reported as one.
         enqueueJson("""{"message":"boom"}""", code = 500)
+        enqueueStatus(500) // mirror
 
         val outcome = checker().newest()
 
@@ -251,7 +298,55 @@ class UpdateCheckerTest {
     @Test
     fun `a list with no readable tag is a failure`() = runBlocking {
         enqueueJson("[${release("latest")}]")
+        enqueueStatus(500) // mirror
 
         assertTrue(checker().newest() is Outcome.Failure)
+    }
+
+    @Test
+    fun `the mirror answers when github does not`() = runBlocking {
+        // The whole point of the mirror: api.github.com is unreachable in the place
+        // where this app is used, and gitee.com is not.
+        enqueueJson("""{"message":"boom"}""", code = 502)
+        enqueueJson("[${mirrorRelease("v1.3.7")}]")
+
+        val info = checker().newest().getOrNull()
+
+        assertEquals("v1.3.7", info?.tag)
+        assertEquals(server.url("/gitee/tag/v1.3.7").toString(), info?.releaseUrl)
+        assertEquals(
+            server.url("/gitee/download/v1.3.7/huishui-v1.3.7-fast.apk").toString(),
+            info?.apkUrl,
+        )
+        // Two requests: GitHub, then the mirror. Neither may carry the token.
+        repeat(2) {
+            val request = takeRequest()
+            assertNull(
+                "the session token must never reach ${request.url}",
+                request.headers["Authorization"],
+            )
+        }
+    }
+
+    @Test
+    fun `the mirror's list is read for the newest tag, not the first one`() = runBlocking {
+        // Same trap as the feed: Gitee lists by time, so the hotfix can arrive first
+        // with an older version number.
+        enqueueJson("""{"message":"boom"}""", code = 500)
+        enqueueJson("[${mirrorRelease("v1.2.9")}, ${mirrorRelease("v1.3.1")}]")
+
+        assertEquals("v1.3.1", checker().newest().getOrNull()?.tag)
+    }
+
+    @Test
+    fun `a mirror entry with no apk still names the version`() = runBlocking {
+        enqueueJson("""{"message":"boom"}""", code = 500)
+        enqueueJson("[${mirrorRelease("v1.3.7", withApk = false)}]")
+
+        val info = checker().newest().getOrNull()
+
+        assertEquals("v1.3.7", info?.tag)
+        assertNull(info?.apkUrl)
+        assertTrue(info!!.releaseUrl.isNotBlank())
     }
 }

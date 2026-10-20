@@ -9,6 +9,12 @@
 
 > 自用学习工具，不发布、不商用、不对外分发。只调用官方 App 已在用的同一接口，不做绕过、破解、篡改；登录复用官方 App 已有登录状态。
 
+## 下载
+
+- **国内**：[Gitee 发行版](https://gitee.com/pansomeone/798QuSiBa/releases) —— 同一个包，国内拉得动。
+- **国外**：[GitHub Releases](https://github.com/PanSomeone/798QuSiBa/releases)。
+- **网页版**（给 iPhone）：<https://pansomeone.github.io/798QuSiBa/>。
+
 ## 功能
 
 - **一键开关热水。** 主界面单按钮：未出水显示「一键启动热水」，出水显示「关闭热水」。

@@ -13,20 +13,20 @@ import okhttp3.Request
 import java.util.concurrent.TimeUnit
 
 /**
- * Asks GitHub what the newest release is.
+ * Asks what the newest release is, and where to get it.
  *
- * Three decisions in here are deliberate, and the first two are about what this
+ * The decisions in here are deliberate, and the first two are about what this
  * class must **not** do.
  *
  * **1. It does not borrow the gateway's OkHttp client.** That client adds
  * `Authorization: <token>` to every request that does not already carry one
  * ([com.killhuishenghuo.core.net.AuthInterceptor]) — correct for the 798 gateway,
- * catastrophic here, because this request goes to `api.github.com`. A session
- * token for someone's dormitory water account must never be handed to GitHub.
+ * catastrophic here, because these requests go to GitHub and to Gitee. A session
+ * token for someone's dormitory water account must never be handed to either.
  * The client below has no interceptors at all, and a test pins the absence of
  * the header through a real MockWebServer.
  *
- * **2. It reads the release list, not `/releases/latest`.** GitHub's "latest"
+ * **2. It reads the release *list*, not `/releases/latest`.** GitHub's "latest"
  * endpoint silently skips pre-releases, and this project's releases are marked
  * pre-release on purpose. Asking `/releases/latest` would therefore answer "no
  * release" for the only releases that exist — a check that can never find an
@@ -43,11 +43,26 @@ import java.util.concurrent.TimeUnit
  * different budget entirely), needs no token, and lists pre-releases, which the
  * `/releases/latest` page and endpoint both refuse to do. Verified live
  * 2026-10-20: 200, 16 KB, every tag from v1.3.3 down, newest first.
+ *
+ * **5. The download comes from the mirror when the mirror has it.** A check that
+ * finds v1.4.0 and then hands the user a 5 MB file from `objects.githubusercontent.com`
+ * at 20 KB/s has not helped anyone standing in a bathroom; the same bytes sit on
+ * `gitee.com` for the people this app is for. So the mirror's URL is tried first
+ * (it is a guess from the tag, hence the HEAD), and the release's own asset is
+ * the fallback. Gitee is also a road of its own when GitHub answers nothing —
+ * see [newestViaMirror].
+ *
+ * The rule this implies: **a release is published to both shelves**, GitHub and
+ * Gitee, in the same run. If only Gitee is updated the check is still right; if
+ * only GitHub is updated the check is right and the download is slow.
  */
 class UpdateChecker(
     private val client: OkHttpClient = defaultClient(),
     private val endpoint: String = RELEASES_URL,
     private val fallbackEndpoint: String = FALLBACK_URL,
+    private val mirrorEndpoint: String = MIRROR_RELEASES_URL,
+    private val mirrorDownload: String = MIRROR_DOWNLOAD,
+    private val mirrorPage: String = MIRROR_PAGE,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
 
@@ -69,14 +84,13 @@ class UpdateChecker(
                     // 出口的额度用完了」,不是「这个请求不合法」—— 而「服务器拒绝了
                     // （错误码 403）」对一个站在浴室门口的人没有任何下一步。
                     //
-                    // 所以先走 github.com 自己的 releases.atom:那是网站,不是 API,
-                    // 额度不共用,也不需要 token。它连不上再说限流那句话。
-                    if (response.code == 403 || response.code == 429) {
-                        return@use newestViaAtom(
-                            reason = AppError.Unexpected("GitHub 这边限流了，过一会儿再看"),
-                        )
-                    }
-                    return@use Outcome.Failure(AppError.Server(response.code, null))
+                    // 所以换路:先问 Gitee 的发行版(国内直连,和 GitHub 不共用额度),
+                    // 再走 github.com 自己的 releases.atom(那是网站,不是 API,额度也
+                    // 不共用,不需要 token)。都堵住才说限流那句话。
+                    return@use otherRoads(
+                        failure = AppError.Server(response.code, null),
+                        rateLimited = response.code == 403 || response.code == 429,
+                    )
                 }
 
                 val body = response.body?.string().orEmpty()
@@ -85,7 +99,12 @@ class UpdateChecker(
 
                 if (release == null) {
                     AppLog.log("Update", "release list had no usable entry entries=${releases.size}")
-                    return@use Outcome.Failure(AppError.Unexpected("服务器上没有可用的发布版本"))
+                    // GitHub 上没有而 Gitee 上有,是「忘了发布到 GitHub」的情况 ——
+                    // 那也是新版本,不该报成「服务器上没有可用的发布版本」。
+                    return@use otherRoads(
+                        failure = AppError.Unexpected("服务器上没有可用的发布版本"),
+                        rateLimited = false,
+                    )
                 }
 
                 AppLog.log(
@@ -96,16 +115,80 @@ class UpdateChecker(
                     UpdateInfo(
                         tag = release.tagName,
                         releaseUrl = release.htmlUrl,
-                        apkUrl = release.assets
-                            .firstOrNull { it.name.endsWith(".apk", ignoreCase = true) }
-                            ?.downloadUrl,
+                        apkUrl = apkUrlFor(
+                            tag = release.tagName,
+                            assetUrl = { release.assets.preferredApkUrl() },
+                        ),
                     ),
                 )
             }
         }.getOrElse { throwable ->
             AppLog.error("Update", throwable, "release lookup failed")
-            Outcome.Failure(ApiResultMapper.toAppError(throwable))
+            // 网络层直接失败(超时、DNS、被墙)时,atom 那条路在同一个国家、同一
+            // 条链路上,基本同样不通 —— 只有 Gitee 值得一试。
+            newestViaMirror()
+                ?: Outcome.Failure(ApiResultMapper.toAppError(throwable))
         }
+    }
+
+    /**
+     * The mirror's release list, which needs no token and no API budget of
+     * GitHub's — and, unlike anything on GitHub, is reachable from a dormitory in
+     * China on a normal evening.
+     *
+     * Returns null when this road is not usable (unreachable, not a list, no tag
+     * this app can read); the caller then keeps whatever error it had.
+     */
+    private fun newestViaMirror(): Outcome<UpdateInfo>? {
+        val request = Request.Builder().url(mirrorEndpoint).build()
+        return runCatching {
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    AppLog.log("Update", "mirror lookup failed http=${response.code}")
+                    return@use null
+                }
+
+                val body = response.body?.string().orEmpty()
+                val releases = NetworkModule.json.decodeFromString<List<GitHubRelease>>(body)
+                val release = newestOf(releases)
+                if (release == null) {
+                    AppLog.log(
+                        "Update",
+                        "mirror had no usable entry entries=${releases.size}",
+                    )
+                    return@use null
+                }
+
+                AppLog.log(
+                    "Update",
+                    "mirror tag=${release.tagName} assets=${release.assets.size}",
+                )
+                Outcome.Success(
+                    UpdateInfo(
+                        tag = release.tagName,
+                        releaseUrl = mirrorPage + release.tagName,
+                        // 镜像自己列出来的资产是事实,不是猜测,所以不再 HEAD 探一次。
+                        apkUrl = release.assets.preferredApkUrl(),
+                    ),
+                )
+            }
+        }.getOrElse { throwable ->
+            AppLog.log("Update", "mirror lookup failed ${throwable::class.simpleName}")
+            null
+        }
+    }
+
+    /**
+     * What to do when GitHub did not answer usefully: the mirror, then the feed.
+     *
+     * [rateLimited] keeps the sentence GitHub's 403 deserves — "GitHub 这边限流了"
+     * — for the case where every road is shut, instead of the generic "server
+     * refused (code 403)", which tells the user nothing they can act on.
+     */
+    private fun otherRoads(failure: AppError, rateLimited: Boolean): Outcome<UpdateInfo> {
+        newestViaMirror()?.let { return it }
+        if (rateLimited) return newestViaAtom(AppError.Unexpected(RATE_LIMIT_SENTENCE))
+        return Outcome.Failure(failure)
     }
 
     /**
@@ -151,7 +234,10 @@ class UpdateChecker(
                     UpdateInfo(
                         tag = tag,
                         releaseUrl = releaseUrl,
-                        apkUrl = apkUrlFor(releaseUrl, tag),
+                        apkUrl = apkUrlFor(
+                            tag = tag,
+                            assetUrl = { guessAssetUrl(releaseUrl, tag) },
+                        ),
                     ),
                 )
             }
@@ -162,30 +248,57 @@ class UpdateChecker(
     }
 
     /**
-     * Where a direct download would be, if it is there.
+     * Where to download [tag]: the mirror first, then whatever the release itself
+     * offered.
+     *
+     * [assetUrl] is a URL the release *listed* (trusted, no probe) or one built
+     * from the project's naming convention (a guess, probed). It is asked for
+     * only when the mirror has nothing — as a lambda, so that walking the
+     * fallback does not spend a request (or, in a test, consume a queued
+     * response) before the mirror has had its say.
+     *
+     * The mirror URL is always a guess — `<tag>` is read from a list that says
+     * nothing about which files the mirror actually holds — so it is probed with a
+     * HEAD, and a 404 simply means "this shelf has not been stocked yet", not "no
+     * download".
+     */
+    private fun apkUrlFor(tag: String, assetUrl: () -> String?): String? {
+        val mirror = "$mirrorDownload/$tag/huishui-${tag.removePrefix("v")}-fast.apk"
+        return if (answers(mirror)) {
+            AppLog.log("Update", "download from the mirror tag=$tag")
+            mirror
+        } else {
+            assetUrl()
+        }
+    }
+
+    /**
+     * Where a direct download would be on the release's own host, if it is there.
      *
      * The asset name is this project's own convention
      * (`huishui-<version>-fast.apk`, the shrunk build that installs over the
      * previous one), so the URL can be constructed without asking the API — but a
      * constructed URL is a guess until something answers, and a guess that 404s
-     * is worse than the release page. Hence the HEAD: 200 keeps it, anything else
-     * (including a network error) leaves [UpdateInfo.apkUrl] null and the row
-     * offers the page.
+     * is worse than the release page.
      */
-    private fun apkUrlFor(releaseUrl: String, tag: String): String? {
-        val marker = TAG_PATH
-        val at = releaseUrl.indexOf(marker)
+    private fun guessAssetUrl(releaseUrl: String, tag: String): String? {
+        val at = releaseUrl.indexOf(TAG_PATH)
         if (at < 0) return null
 
         val base = releaseUrl.substring(0, at)
         val url = "$base/download/$tag/huishui-${tag.removePrefix("v")}-fast.apk"
-        val head = Request.Builder().url(url).head().build()
+        return if (answers(url)) url else null
+    }
 
+    /** A HEAD, and a yes or no. Redirects are followed, so a CDN in front of a
+     *  release still counts as the file being there. */
+    private fun answers(url: String): Boolean {
+        val head = Request.Builder().url(url).head().build()
         return runCatching {
-            client.newCall(head).execute().use { if (it.isSuccessful) url else null }
+            client.newCall(head).execute().use { it.isSuccessful }
         }.getOrElse { throwable ->
             AppLog.log("Update", "apk probe failed ${throwable::class.simpleName}")
-            null
+            false
         }
     }
 
@@ -215,6 +328,24 @@ class UpdateChecker(
         const val FALLBACK_URL = "https://github.com/PanSomeone/798QuSiBa/releases.atom"
 
         /**
+         * The mirror's own release list (Gitee API v5). Public repositories are
+         * readable without a token; verified live 2026-10-21: 200, one release,
+         * four assets each with `browser_download_url`.
+         */
+        const val MIRROR_RELEASES_URL =
+            "https://gitee.com/api/v5/repos/pansomeone/798QuSiBa/releases?per_page=10"
+
+        /** `<mirror>/<tag>/<file>` — the same shape as GitHub's download path. */
+        const val MIRROR_DOWNLOAD =
+            "https://gitee.com/pansomeone/798QuSiBa/releases/download"
+
+        /** Where a human reads the notes on the mirror. */
+        const val MIRROR_PAGE =
+            "https://gitee.com/pansomeone/798QuSiBa/releases/tag/"
+
+        const val RATE_LIMIT_SENTENCE = "GitHub 这边限流了，过一会儿再看"
+
+        /**
          * The segment that turns a release page into a download: the asset lives at
          * `<repo>/releases/download/<tag>/<file>`, i.e. the page's last path segment
          * replaced. Cutting at `/tag/` keeps `releases` in the base, which is what
@@ -228,6 +359,18 @@ class UpdateChecker(
          * different host (a test server, a mirror) works unchanged.
          */
         val TAG_LINK = Regex("""https?://[^"'<>\s]+?/releases/tag/([^"'<>\s?&#]+)""")
+
+        /**
+         * The APK to install: `-fast.apk` first, because that is the shrunk build
+         * that installs over the previous version. The second `firstOrNull` catches
+         * a release that renamed the file, and being able to download *something*
+         * beats a row that only offers a page.
+         */
+        fun List<GitHubAsset>.preferredApkUrl(): String? =
+            (firstOrNull { it.name.endsWith("-fast.apk", ignoreCase = true) }
+                ?: firstOrNull { it.name.endsWith(".apk", ignoreCase = true) })
+                ?.downloadUrl
+                ?.takeIf { it.isNotBlank() }
 
         fun defaultClient(): OkHttpClient = OkHttpClient.Builder()
             .connectTimeout(10, TimeUnit.SECONDS)

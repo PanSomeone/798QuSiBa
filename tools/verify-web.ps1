@@ -274,6 +274,18 @@ function loadFrame(src, waitMs) {
         'left=' + Math.round(box.left) + ' right=' + Math.round(box.right) +
         ' page=' + doc.documentElement.clientWidth);
     }
+    // ---- where to get the Android app ----
+    // The mirror is the only one of the two links somebody in China can actually
+    // follow; the GitHub release page stays as the original shelf. Both must be
+    // there, and the domestic one comes first because it is the one that works.
+    const shelf = Array.from(doc.querySelectorAll('.card a'))
+      .filter((a) => ((a.getAttribute('href') || '').indexOf('/releases') >= 0));
+    record('the about card links to both download shelves', shelf.length >= 2,
+      'links=' + shelf.map((a) => a.getAttribute('href')).join(' '));
+    record('the domestic shelf is the first download link',
+      shelf.length >= 1 && (shelf[0].getAttribute('href') || '').indexOf('gitee.com') >= 0,
+      'first=' + (shelf.length ? shelf[0].getAttribute('href') : 'none'));
+
     // Nothing to say means no empty card: an always-empty block reads as a broken
     // feature rather than as "nothing has been announced yet".
     const noHistory = doc.getElementById('card-notice-history');
