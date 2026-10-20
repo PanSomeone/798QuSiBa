@@ -66,8 +66,8 @@ android {
         applicationId = "com.killhuishenghuo"
         minSdk = 26
         targetSdk = 37
-        versionCode = 14
-        versionName = "1.3.7"
+        versionCode = 15
+        versionName = "1.3.8"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

@@ -78,7 +78,7 @@ $qrParser = Slurp 'app\src\main\java\com\killhuishenghuo\data\model\DeviceQr.kt'
 
 Write-Host ""
 Write-Host "1. version" -ForegroundColor Cyan
-Check 'versionName is 1.3.7' ($gradle -match 'versionName\s*=\s*"1\.3\.7"') 'not found in app/build.gradle.kts'
+Check 'versionName is 1.3.8' ($gradle -match 'versionName\s*=\s*"1\.3\.8"') 'not found in app/build.gradle.kts'
 
 # The web client shows a version in Settings, and it is a hand-copied number. Two
 # hand-copied numbers drift; one of them is always right and nobody notices the
@@ -92,7 +92,7 @@ if (Test-Path $webDir) {
         "docs/app.js says '$webVersion', app/build.gradle.kts says '$androidVersion'"
 }
 
-Check 'versionCode is 14'    ($gradle -match 'versionCode\s*=\s*14') `
+Check 'versionCode is 15'    ($gradle -match 'versionCode\s*=\s*15') `
     'Android refuses an install over an equal-or-lower code, and earlier builds are already on a phone'
 
 Write-Host ""
@@ -242,10 +242,10 @@ Check 'the row is wired in'         ($settings -match 'UpdateRow\(') 'the block 
 Check 'it knows the domestic mirror'  ($updateChecker -match 'gitee\.com/api/v5/repos/pansomeone/798QuSiBa/releases') `
     'the mirror is the only release list that answers from a dormitory'
 Check 'the mirror can answer on its own' ($updateChecker -match 'fun newestViaMirror\(') 'missing the mirror road'
-$otherRoads = [regex]::Match($updateChecker, '(?s)private fun otherRoads\(.*?\n    \}').Value
-Check 'the mirror is tried before the feed' `
-    ($otherRoads -ne '' -and $otherRoads.IndexOf('newestViaMirror') -ge 0 -and $otherRoads.IndexOf('newestViaAtom') -gt $otherRoads.IndexOf('newestViaMirror')) `
-    'github.com and api.github.com are blocked together; gitee.com is not'
+$newestBody = [regex]::Match($updateChecker, '(?s)suspend fun newest\(\).*?\n    \}').Value
+Check 'the mirror is asked before github is' `
+    ($newestBody -ne '' -and $newestBody.IndexOf('newestViaMirror') -ge 0 -and $newestBody.IndexOf('newestViaGitHub') -gt $newestBody.IndexOf('newestViaMirror')) `
+    'waiting for api.github.com to time out before asking gitee.com turns the check into a ten-second stare'
 Check 'the download comes from the mirror when it has it' ($updateChecker -match 'download from the mirror') `
     'a check that finds the version and then downloads it at 20KB/s has not helped anybody'
 

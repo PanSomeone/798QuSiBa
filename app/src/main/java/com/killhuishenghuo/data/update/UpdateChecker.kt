@@ -44,17 +44,22 @@ import java.util.concurrent.TimeUnit
  * `/releases/latest` page and endpoint both refuse to do. Verified live
  * 2026-10-20: 200, 16 KB, every tag from v1.3.3 down, newest first.
  *
- * **5. The download comes from the mirror when the mirror has it.** A check that
+ * **5. The mirror is asked first, and the download comes from it.** A check that
  * finds v1.4.0 and then hands the user a 5 MB file from `objects.githubusercontent.com`
  * at 20 KB/s has not helped anyone standing in a bathroom; the same bytes sit on
- * `gitee.com` for the people this app is for. So the mirror's URL is tried first
- * (it is a guess from the tag, hence the HEAD), and the release's own asset is
- * the fallback. Gitee is also a road of its own when GitHub answers nothing —
- * see [newestViaMirror].
+ * `gitee.com` for the people this app is for. Two consequences:
+ *
+ * - the *list* is read from Gitee before GitHub is touched at all
+ *   ([newestViaMirror]), because waiting for `api.github.com` to time out and only
+ *   then asking Gitee turns "检查更新" into a ten-second stare;
+ * - the *download* URL is built from the tag on the mirror first (a guess, hence
+ *   the HEAD), and the release's own asset is the fallback.
  *
  * The rule this implies: **a release is published to both shelves**, GitHub and
- * Gitee, in the same run. If only Gitee is updated the check is still right; if
- * only GitHub is updated the check is right and the download is slow.
+ * Gitee, in the same run — `tools/publish-github.ps1` and `tools/publish-gitee.ps1`.
+ * If only GitHub is updated the check still finds the version (the mirror has no
+ * such tag, so it falls through) and the download is slow; if only Gitee is
+ * updated, everything is fast.
  */
 class UpdateChecker(
     private val client: OkHttpClient = defaultClient(),
@@ -67,12 +72,21 @@ class UpdateChecker(
 ) {
 
     suspend fun newest(): Outcome<UpdateInfo> = withContext(ioDispatcher) {
+        // 先问 Gitee。这条线路在国内直连、不需要 token、也不占 GitHub 的额度;
+        // 反过来先问 api.github.com 的话,在国内常见的结果是等十几秒超时,然后才
+        // 轮到 Gitee —— 「检查更新」变成一次罚站。它答不上来(连不上、列表为空、
+        // tag 读不了)才回到下面这条老路。
+        newestViaMirror()?.let { return@withContext it }
+        newestViaGitHub()
+    }
+
+    private fun newestViaGitHub(): Outcome<UpdateInfo> {
         val request = Request.Builder()
             .url(endpoint)
             .header("Accept", "application/vnd.github+json")
             .build()
 
-        runCatching {
+        return runCatching {
             client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
                     AppLog.log(
@@ -84,9 +98,8 @@ class UpdateChecker(
                     // 出口的额度用完了」,不是「这个请求不合法」—— 而「服务器拒绝了
                     // （错误码 403）」对一个站在浴室门口的人没有任何下一步。
                     //
-                    // 所以换路:先问 Gitee 的发行版(国内直连,和 GitHub 不共用额度),
-                    // 再走 github.com 自己的 releases.atom(那是网站,不是 API,额度也
-                    // 不共用,不需要 token)。都堵住才说限流那句话。
+                    // 所以换路:走 github.com 自己的 releases.atom(那是网站,不是 API,
+                    // 额度也不共用,不需要 token)。镜像已经在 [newest] 里问过了。
                     return@use otherRoads(
                         failure = AppError.Server(response.code, null),
                         rateLimited = response.code == 403 || response.code == 429,
@@ -125,9 +138,8 @@ class UpdateChecker(
         }.getOrElse { throwable ->
             AppLog.error("Update", throwable, "release lookup failed")
             // 网络层直接失败(超时、DNS、被墙)时,atom 那条路在同一个国家、同一
-            // 条链路上,基本同样不通 —— 只有 Gitee 值得一试。
-            newestViaMirror()
-                ?: Outcome.Failure(ApiResultMapper.toAppError(throwable))
+            // 条链路上,基本同样不通,镜像也已经试过 —— 没有别的路可走了。
+            Outcome.Failure(ApiResultMapper.toAppError(throwable))
         }
     }
 
@@ -179,14 +191,14 @@ class UpdateChecker(
     }
 
     /**
-     * What to do when GitHub did not answer usefully: the mirror, then the feed.
+     * What to do when GitHub's API did not answer usefully: the feed, and nothing
+     * else — [newest] already asked the mirror before it ever came here.
      *
      * [rateLimited] keeps the sentence GitHub's 403 deserves — "GitHub 这边限流了"
      * — for the case where every road is shut, instead of the generic "server
      * refused (code 403)", which tells the user nothing they can act on.
      */
     private fun otherRoads(failure: AppError, rateLimited: Boolean): Outcome<UpdateInfo> {
-        newestViaMirror()?.let { return it }
         if (rateLimited) return newestViaAtom(AppError.Unexpected(RATE_LIMIT_SENTENCE))
         return Outcome.Failure(failure)
     }
